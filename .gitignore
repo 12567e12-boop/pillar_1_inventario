@@ -27,7 +27,7 @@ laZona/
 # Django
 *.log
 local_settings.py
-db.sqlite3
+# db.sqlite3  # Comentado para incluir base de datos
 db.sqlite3-journal
 /media/
 /staticfiles/
@@ -45,11 +45,11 @@ db.sqlite3-journal
 .env.local
 
 # Sensitive data
-settings_local.py
+# settings_local.py  # Comentado para incluir configuración
 secrets.txt
 
 # Backup files
-backups/
+# backups/  # Comentado para incluir backups
 
 # Backups
 *.bak
