@@ -1,0 +1,2 @@
+# Dependencias para el Bot de Telegram
+python-telegram-bot==20.7
