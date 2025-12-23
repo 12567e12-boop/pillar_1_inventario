@@ -1,0 +1,113 @@
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Gafete de {{ empleado.nombre }}</title>
+        <style>
+            /* Estilos generales */
+            body {
+                font-family: Arial, sans-serif;
+                text-align: center;
+                padding: 0;
+                margin: 0;
+                font-size: 10px;
+            }
+
+            /* Contenedor para los gafetes */
+            .gafetes-container {
+                display: flex;
+                justify-content:left;
+                padding: 10mm; /* Márgenes para ajustar al tamaño A4 */
+                box-sizing: border-box;
+                flex-wrap: wrap;
+                
+                
+            }
+
+            .gafete {
+                height: 302.4px;  /* Tamaño del gafete */
+                width: 174px;  /* Tamaño del gafete */
+                border-radius: 1%;
+                padding: 20px;
+                box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-evenly;
+                align-items: center;
+                background-image: url('{{ MEDIA_URL }}front_gafete.jpg');
+                background-size: cover;
+            }
+
+
+            .foto img {
+                width: 80px;
+                height: 95px;
+                padding-left: 21px;
+                padding-top: 43px;
+            }
+
+            
+            .info strong {
+
+                font-weight: bold;
+            }
+
+            .email {
+                font-size: 8px;
+                color: #000000;
+                font-weight: bold;
+                padding-bottom: 26px;
+            }
+
+            /* Cara trasera del gafete (solo línea para firma) */
+            .cara-trasera {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                background-image: url('{{ MEDIA_URL }}back_gafete.jpg');
+                background-size: cover;
+                height: 302.4px;  /* Tamaño del gafete */
+                width: 172px;  /* Tamaño del gafete */
+
+            }
+
+        </style>
+    </head>
+
+
+
+    <body>
+        <div class="gafetes-container">
+            <!-- Cara frontal del gafete izquierdo -->
+            <div class="gafete">
+
+
+                <!-- Foto del empleado -->
+                <div class="foto">
+                    {% if empleado.foto %}
+                        <img src="http://127.0.0.1:8000{{ empleado.foto.url }}" alt="Foto de {{ empleado.nombre }}">
+                    {% endif %}
+                </div>
+
+                <!-- Información del empleado -->
+                <div class="info">
+                    <p><strong>Nombre:</strong> {{ empleado.nombre }}</p>
+                    <p><strong>Puesto:</strong> {{ empleado.puesto|default:"-" }}</p>
+                    <p><strong>NSS:</strong> {{ empleado.nss|default:"-" }}</p>
+                    <p><strong>Teléfono:</strong> {{ empleado.tel|default:"-" }}</p>
+                </div>
+
+                <!-- Correo electrónico -->
+                <div class="email">
+                    dreachtstruchtur@gmail.com
+                    
+                </div>
+            </div>
+
+            <!-- Cara trasera del gafete derecho -->
+            <div class="gafete cara-trasera">
+            </div>
+        </div>
+    </body>
+    </html>

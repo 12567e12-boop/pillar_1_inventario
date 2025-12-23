@@ -1,0 +1,374 @@
+{% load static %}
+
+<div id="prestados">
+    <div class="panel panel-light">
+        <div class="panel-heading">
+            <div class="panel-title">
+                <i class="fa fa-list-alt"></i> Productos no consumibles prestados
+            </div>
+        </div>
+        <div class="panel-body">
+            <div class="table-responsive{% if not perms.Almacen.view_registro %} hidden{% endif %}">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Bloque</th>
+                            <th>Empleado</th>
+                            <th>Fecha</th>
+                            <th>Producto</th>
+                            <th>Unidad</th>
+                            <th>Cantidad</th>
+                            <th>Usuario</th>
+                            {% if perms.Almacen.add_prestamodevuelto %}
+                            <th>Acci&oacute;n</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody id="id-prestados">
+                        {% if perms.Almacen.view_registro %}
+                        {% if registros %}
+                        {% for p in registros %}
+                        <tr id="id-prestado-{{ p.pk }}">
+                            <td style="white-space:nowrap">
+                                {{ p.pk }}
+                            </td>
+                            <td style="white-space:nowrap">
+                                {{ p.bloque }}
+                            </td style="white-space:nowrap">
+                            <td style="white-space:nowrap">
+                                {{ p.empleado }}
+                            </td>
+                            <td style="white-space:nowrap">
+                                {{ p.fecha|date:'Y-m-d' }}
+                            </td>
+                            <td style="white-space:nowrap">
+                                {{ p.producto }}
+                            </td>
+                            <td style="white-space:nowrap">
+                                {{ p.producto.unidad }}
+                            </td>
+                            <td style="white-space:nowrap">
+                                {{ p.cantidad }}
+                            </td>
+                            <td style="white-space:nowrap">
+                                {{ p.usuario.username|upper }}
+                            </td>
+                            {% if perms.Almacen.add_prestamodevuelto %}
+                            <td style="white-space:nowrap">
+                                <button type="button" class="btn btn-primary btn-xs"
+                                    onclick="productoDevuelto('{{ p.pk }}', '{{ p.bloque }}', '{{ p.empleado }}', '{{ p.producto }}', '{{ p.cantidad }}')">
+                                    <i class="fa fa-refresh"></i> &nbsp;DEVUELTO
+                                </button>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td colspan="8" style="color: orange;">No hay elementos que mostrar. La tabla se
+                                encuentra vac&iacute;a en este momento.</td>
+                        </tr>
+                        {% endif %}
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+            {% if not perms.Almacen.view_registro %}
+            <div class="callout callout-danger">
+                <p>No tienes permisos para ver esta tabla.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <script type="text/javascript">
+        function productoDevuelto(id, bloque, empleado, producto, cantidad) {
+            Lobibox.confirm({
+                title: 'Producto devuelto (ID: ' + id + ')',
+                msg: 'Se ha prestado el producto <b>' + producto + ' (x' + cantidad + ')</b> a <b>' + empleado + '</b> para <b>' + bloque + '</b>.<br></br>¿El producto a sido devuelto?',
+                buttons: {
+                    yes: {
+                        'class': 'lobibox-btn lobibox-btn-yes',
+                        text: 'Si'
+                    },
+                    no: {
+                        'class': 'lobibox-btn lobibox-btn-no',
+                        text: 'No'
+                    }
+                },
+                callback: function ($this, type, ev) {
+                    if (type == 'yes') {
+                        $.ajax({
+                            url: "{% url 'registro_devolver' %}",
+                            method: 'POST',
+                            data: {
+                                id: id,
+                                csrfmiddlewaretoken: '{{ csrf_token }}'
+                            },
+                            success: function (data) {
+                                if (data == 'OK') {
+                                    Lobibox.alert('success', {
+                                        title: 'Correcto!',
+                                        msg: 'El producto se ha devuelto correctamente.',
+                                        buttons: {
+                                            ok: {
+                                                text: 'Continuar',
+                                                class: 'btn btn-info',
+                                                closeOnClick: true
+                                            },
+                                        }
+                                    });
+                                    $('#id-prestado-' + id).remove();
+                                    var count = 0,
+                                        list = document.getElementById('id-prestados').children;
+                                    for (var i = 0; i < list.length; i++) {
+                                        var el = list[i];
+                                        if (list[i] != undefined) count++;
+                                    }
+                                    if (count == 0) {
+                                        $('#id-prestados').html('<tr><td colspan="8" style="color: orange;">No hay elementos que mostrar. La tabla se encuentra vac&iacute;a en este momento.</td></tr>');
+                                    }
+                                    actualizarDevueltos();
+                                } else {
+                                    Lobibox.alert('error', {
+                                        title: 'Error al devolver!',
+                                        msg: data,
+                                        buttons: {
+                                            ok: {
+                                                text: 'Continuar',
+                                                class: 'btn btn-info',
+                                                closeOnClick: true
+                                            },
+                                        }
+                                    });
+                                }
+                            },
+                            error: function (j, t, e) {
+                                Lobibox.alert('error', {
+                                    title: 'Error al devolver!',
+                                    msg: 'Intente de nuevo en unos minutos y si el problema persiste contacte al desarrollador.',
+                                    buttons: {
+                                        ok: {
+                                            text: 'Continuar',
+                                            class: 'btn btn-info',
+                                            closeOnClick: true
+                                        },
+                                    }
+                                });
+                            }
+                        });
+                    }
+                }
+            });
+        }
+    </script>
+
+    <div class="panel panel-light">
+        <div class="panel-heading">
+            <div class="panel-title">
+                <i class="fa fa-list-alt"></i> Historial de productos prestados devueltos
+            </div>
+        </div>
+        <div class="panel-body">
+            <div class="table-responsive{% if not perms.Almacen.view_prestamodevuelto %} hidden{% endif %}">
+                <table id="data-table-devueltos" class="display table table-striped table-bordered" cellspacing="0"
+                    width="100%">
+                    <thead>
+                        <tr>
+                            <th class="with-input col-sm-1"><input type="text" class="form-control input-sm" style="width: 100%;" /></th>
+                            <th class="with-input" style="min-width: 135px;">
+                                <select class="form-control input-sm" style="width: 100%;">
+                                    <option value=""></option>
+                                    {% for p in bloques %}
+                                    <option>{{ p }}</option>
+                                    {% endfor %}
+                                </select>
+                            </th>
+                            <th class="with-input"><input type="text" class="form-control input-sm" style="width: 100%;" /></th>
+                            <th class="with-input"><input type="text" class="form-control input-sm" style="width: 100%;" /></th>
+                            <th class="with-input" style="min-width: 135px;">
+                                <select class="form-control input-sm" style="width: 100%;">
+                                    <option value=""></option>
+                                    {% for p in unidades %}
+                                    <option>{{ p }}</option>
+                                    {% endfor %}
+                                </select>
+                            </th>
+                            <th class="with-input"><input type="text" class="form-control input-sm" style="width: 100%;" /></th>
+                            <th class="with-input" style="min-width: 135px;">
+                                <div class="input-group datepicker-filter date">
+                                    <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                                    <input type="text" class="form-control input-sm" style="width: 100%;" />
+                                </div>
+                            </th>
+                            <th class="with-input" style="min-width: 135px;">
+                                <select class="form-control">
+                                    <option value=""></option>
+                                    {% for p in usuarios %}
+                                    <option>{{ p.username|upper }}</option>
+                                    {% endfor %}
+                                </select>
+                            </th>
+                            <th class="with-input" style="min-width: 135px;">
+                                <div class="input-group datepicker-filter date">
+                                    <span class="input-group-addon"><i class="fa fa-calendar"></i></span>
+                                    <input type="text" class="form-control" />
+                                </div>
+                            </th>
+                            <th class="with-input" style="min-width: 135px;">
+                                <select class="form-control">
+                                    <option value=""></option>
+                                    {% for p in usuarios %}
+                                    <option>{{ p.username|upper }}</option>
+                                    {% endfor %}
+                                </select>
+                            </th>
+                        </tr>
+                        <tr>
+                            <th>ID</th>
+                            <th>Bloque</th>
+                            <th>Empleado</th>
+                            <th>Producto</th>
+                            <th>Unidad</th>
+                            <th>Cantidad</th>
+                            <th style="white-space:nowrap">Fecha entregado</th>
+                            <th style="white-space:nowrap">Entregado por</th>
+                            <th style="white-space:nowrap">Fecha recibido</th>
+                            <th style="white-space:nowrap">Recibido por</th>
+                        </tr>
+                    </thead>
+                    <tbody id="id-devueltos">
+                        {% if perms.Almacen.view_prestamodevuelto %}
+                        {% for p in devueltos %}
+                        <tr>
+                            <td style="white-space:nowrap">
+                                {{ p.pk }}
+                            </td>
+                            <td style="white-space:nowrap">
+                                {{ p.bloque }}
+                            </td>
+                            <td style="white-space:nowrap">
+                                {{ p.empleado }}
+                            </td>
+                            <td style="white-space:nowrap">
+                                {{ p.producto }}
+                            </td>
+                            <td style="white-space:nowrap">
+                                {{ p.producto.unidad }}
+                            </td>
+                            <td style="white-space:nowrap">
+                                {{ p.cantidad }}
+                            </td>
+                            <td style="white-space:nowrap">
+                                {{ p.fecha_entregado|date:'Y-m-d' }}
+                            </td>
+                            <td style="white-space:nowrap">
+                                {{ p.entregado_por.username|upper }}
+                            </td>
+                            <td style="white-space:nowrap">
+                                {{ p.fecha_recibido|date:'Y-m-d' }}
+                            </td>
+                            <td style="white-space:nowrap">
+                                {{ p.recibido_por.username|upper }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+            {% if not perms.Almacen.view_prestamodevuelto %}
+            <div class="callout callout-danger">
+                <p>No tienes permisos para ver esta tabla.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <script type="text/javascript">
+        var tableDevueltos;
+        var dt_lang = {
+            "decimal": "",
+            "emptyTable": "No hay información",
+            "info": "Mostrando _START_ a _END_ de _TOTAL_ entradas",
+            "infoEmpty": "Mostrando 0 to 0 of 0 entradas",
+            "infoFiltered": "(Filtrado de _MAX_ total entradas)",
+            "infoPostFix": "",
+            "thousands": ",",
+            "lengthMenu": "Mostrar _MENU_ entradas",
+            "loadingRecords": "Cargando...",
+            "processing": "Procesando...",
+            "search": "Buscar:",
+            "zeroRecords": "Sin resultados encontrados",
+            "paginate": {
+                "first": "&lt;&lt;",
+                "last": "&gt;&gt;",
+                "next": "&gt;",
+                "previous": "&lt;"
+            }
+        };
+        LobiAdmin.loadScript([
+            "{% static 'js/plugin/datatables/datatables.min.js' %}"
+        ], function () {
+            LobiAdmin.loadScript([
+                "{% static 'js/plugin/bootstrap-datepicker/bootstrap-datepicker.js' %}"
+            ], function () {
+                LobiAdmin.loadScript([
+                    "{% static 'js/plugin/bootstrap-datepicker/locales/bootstrap-datepicker.es.js' %}"
+                ], initPage);
+            });
+        });
+
+        function initPage() {
+            tableDevueltos = $('#data-table-devueltos').DataTable({ language: dt_lang });
+            $("#data-table-devueltos thead th input[type=text]").on('keyup change', function () {
+                tableDevueltos
+                    .column($(this).closest('th').index() + ':visible')
+                    .search(this.value)
+                    .draw();
+            });
+            $("#data-table-devueltos thead th select").on('change', function () {
+                var val = $.fn.dataTable.util.escapeRegex(
+                    $(this).val()
+                );
+                tableDevueltos
+                    .column($(this).closest('th').index() + ':visible')
+                    .search(val ? '^' + val + '$' : '', true, false)
+                    .draw();
+            });
+            $('.datepicker-filter').datepicker({
+                format: 'yyyy-mm-dd',
+                language: 'es'
+            });
+        }
+
+        function actualizarDevueltos() {
+            $.ajax({
+                url: "{% url 'devueltos_refresh' %}",
+                method: 'POST',
+                data: {
+                    csrfmiddlewaretoken: '{{ csrf_token }}'
+                },
+                success: function (data) {
+                    if (data != 'NO') {
+                        tableDevueltos.destroy();
+                        $('#id-devueltos').html(data);
+                        tableDevueltos = $('#data-table-devueltos').DataTable({ language: dt_lang }).draw();
+                    }
+                }
+            });
+        }
+
+        $(".panel").lobiPanel({
+            reload: false,
+            close: false,
+            editTitle: false,
+            unpin: false,
+            minimize: {
+                tooltip: 'Minimizar'
+            },
+            expand: {
+                tooltip: 'Expandir'
+            }
+        });
+    </script>
+</div>

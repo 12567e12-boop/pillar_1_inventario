@@ -1,0 +1,667 @@
+{% extends 'app_PDF_maker/base.html' %}
+
+{% block title %}Requisiciones - Dreacht Hub{% endblock %}
+
+{% block extra_head %}
+<style>
+    body,
+    html {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow-x: hidden;
+        overflow-y: auto;
+    }
+
+    #pdf-container {
+        position: relative;
+        width: 100%;
+        height: auto;
+        min-height: 100vh;
+        overflow: visible;
+        background: #f0f0f0;
+        padding-bottom: 50px;
+    }
+
+    #pdf-canvas {
+        display: block;
+        margin: 0 auto;
+        max-width: 100%;
+        height: auto;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    #form-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 5;
+    }
+
+    .campo {
+        position: absolute;
+        font-size: 14px;
+        border: 1px solid #777;
+        border-radius: 4px;
+        padding: 3px 6px;
+        background-color: rgba(255, 255, 255, 0.9);
+        pointer-events: auto;
+        box-sizing: border-box;
+        z-index: 10;
+    }
+
+    #campo-fecha_soli,
+    #campo-fecha_util {
+        text-align: center;
+    }
+
+    #campo-especialidad {
+        text-align: center;
+    }
+
+    #submit-btn {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 8px 18px;
+        font-weight: bold;
+        z-index: 1000;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="pdf-container">
+    <canvas id="pdf-canvas"></canvas>
+
+    <form id="form-overlay" method="POST"
+        action="{% if edit_mode %}{% url 'requisiciones_edit' token %}{% else %}{% url 'requisiciones' %}{% endif %}">
+        {% csrf_token %}
+
+        <!-- Campos (coordenadas relativas %) -->
+        {{ form.obra }}
+        {{ form.ubicacion }}
+        {{ form.numero_de_articulos }}
+        {{ form.fecha_soli }}
+        {{ form.fecha_util }}
+        {{ form.contratista_soli }}
+        {{ form.contratista_auto }}
+        {{ form.especialidad }}
+        {{ form.observaciones }}
+
+        <!-- Campos para items (14 filas) -->
+        {% for i in "1234567891011121314"|make_list %}
+        {% if forloop.counter <= 14 %} <select name="item{{ forloop.counter }}_descripcion" class="campo"
+            id="campo-item{{ forloop.counter }}_descripcion">
+            <option value="">--- Selecciona un producto ---</option>
+            </select>
+            <input type="text" name="item{{ forloop.counter }}_unidad" placeholder="Unidad" class="campo"
+                id="campo-item{{ forloop.counter }}_unidad" readonly>
+            <input type="number" step="0.01" name="item{{ forloop.counter }}_cantidad" placeholder="Cantidad"
+                class="campo" id="campo-item{{ forloop.counter }}_cantidad">
+            {% endif %}
+            {% endfor %}
+
+            <button id="submit-btn" type="submit" class="btn btn-danger">Generar PDF</button>
+    </form>
+
+    {% if form.errors %}
+    <div
+        style="position: fixed; top: 10px; right: 10px; background: red; color: white; padding: 10px; border-radius: 5px;">
+        <strong>Errores en el formulario:</strong>
+        <ul>
+            {% for field in form %}
+            {% for error in field.errors %}
+            <li>{{ field.label }}: {{ error }}</li>
+            {% endfor %}
+            {% endfor %}
+            {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.9.179/pdf.min.js"></script>
+<script>
+    const url = '/hub/media/requiscion_template.pdf';
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.9.179/pdf.worker.min.js';
+
+    const canvas = document.getElementById('pdf-canvas');
+    const ctx = canvas.getContext('2d');
+    const overlayForm = document.getElementById('form-overlay');
+    const container = document.getElementById('pdf-container');
+    const pdfOriginal = { width: 612, height: 792 };
+    let isRendering = false; // Prevent concurrent renders
+    let resizeTimer = null; // Debounce resize events
+
+    const campos = {
+        obra: { x: 192, y: 616 },
+        ubicacion: { x: 178, y: 640 },
+        numero_de_articulos: { x: 230, y: 592 },
+        fecha_soli: { x: 480, y: 640 },
+        fecha_util: { x: 480, y: 616 },
+        contratista_soli: { x: 170, y: 562 },
+        contratista_auto: { x: 113, y: 533 },
+        especialidad: { x: 163, y: 505 },
+        observaciones: { x: 464, y: 64 },
+        // Campos para items (14 filas)
+        item1_descripcion: { x: 46, y: 430 },
+        item1_unidad: { x: 394, y: 430 },
+        item1_cantidad: { x: 315, y: 430 },
+        item2_descripcion: { x: 46, y: 402 },
+        item2_unidad: { x: 394, y: 402 },
+        item2_cantidad: { x: 315, y: 402 },
+        item3_descripcion: { x: 46, y: 374 },
+        item3_unidad: { x: 394, y: 374 },
+        item3_cantidad: { x: 315, y: 374 },
+        item4_descripcion: { x: 46, y: 346 },
+        item4_unidad: { x: 394, y: 346 },
+        item4_cantidad: { x: 315, y: 346 },
+        item5_descripcion: { x: 46, y: 318 },
+        item5_unidad: { x: 394, y: 318 },
+        item5_cantidad: { x: 315, y: 318 },
+        item6_descripcion: { x: 46, y: 290 },
+        item6_unidad: { x: 394, y: 290 },
+        item6_cantidad: { x: 315, y: 290 },
+        item7_descripcion: { x: 46, y: 262 },
+        item7_unidad: { x: 394, y: 262 },
+        item7_cantidad: { x: 315, y: 262 },
+        item8_descripcion: { x: 46, y: 234 },
+        item8_unidad: { x: 394, y: 234 },
+        item8_cantidad: { x: 315, y: 234 },
+        item9_descripcion: { x: 46, y: 206 },
+        item9_unidad: { x: 394, y: 206 },
+        item9_cantidad: { x: 315, y: 206 },
+        item10_descripcion: { x: 46, y: 178 },
+        item10_unidad: { x: 394, y: 178 },
+        item10_cantidad: { x: 315, y: 178 },
+        item11_descripcion: { x: 46, y: 150 },
+        item11_unidad: { x: 394, y: 150 },
+        item11_cantidad: { x: 315, y: 150 },
+        item12_descripcion: { x: 46, y: 122 },
+        item12_unidad: { x: 394, y: 122 },
+        item12_cantidad: { x: 315, y: 122 },
+        item13_descripcion: { x: 46, y: 94 },
+        item13_unidad: { x: 394, y: 94 },
+        item13_cantidad: { x: 315, y: 94 },
+        item14_descripcion: { x: 46, y: 66 },
+        item14_unidad: { x: 394, y: 66 },
+        item14_cantidad: { x: 315, y: 66 }
+    };
+
+    const fieldScales = {
+        obra: { widthScale: 0.94, heightScale: 0.7, fontScale: 1.0 },
+        ubicacion: { widthScale: 1, heightScale: 0.7, fontScale: 0.7 },
+        numero_de_articulos: { widthScale: 0.77, heightScale: 0.7, fontScale: 1.0 },
+        fecha_soli: { widthScale: 0.4, heightScale: 0.7, fontScale: 1.0 },
+        fecha_util: { widthScale: 0.4, heightScale: 0.7, fontScale: 1.0 },
+        especialidad: { widthScale: 1.355, heightScale: 0.7, fontScale: 0.7 },
+        contratista_soli: { widthScale: 1.32, heightScale: 0.7, fontScale: 1.0 },
+        contratista_auto: { widthScale: 1.58, heightScale: 0.7, fontScale: 0.7 },
+        fecha_hora_creacion: { widthScale: 1.2, heightScale: 0.7, fontScale: 0.9 },
+        observaciones: { widthScale: 0.55, heightScale: 15, fontScale: 1.0 },
+        item_descripcion: { widthScale: 1.21, heightScale: 0.9, fontScale: 1.0 },
+        item_unidad: { widthScale: 0.311, heightScale: 0.9, fontScale: 1.0 },
+        item_cantidad: { widthScale: 0.343, heightScale: 0.9, fontScale: 1.0 }
+    };
+
+    // SOLUCIÓN COMPLETA - Reiniciar todo el enfoque
+    function renderPDF(url) {
+        // Prevent multiple concurrent renders
+        if (isRendering) {
+            console.log('Render already in progress, skipping...');
+            return;
+        }
+
+        isRendering = true;
+
+        // Limpiar completamente
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Resetear estilos del contenedor
+        container.style.position = 'relative';
+        container.style.width = '100%';
+        container.style.height = 'auto';
+        container.style.overflow = 'visible';
+        pdfjsLib.getDocument(url).promise.then(pdf => {
+            pdf.getPage(1).then(page => {
+                const viewportUnscaled = page.getViewport({ scale: 1 });
+
+                // Usar escala para mostrar todo el PDF sin recortar
+                const scale = Math.min(
+                    window.innerWidth / viewportUnscaled.width,
+                    (window.innerHeight * 0.9) / viewportUnscaled.height  // Dejar espacio para UI
+                );
+
+                const viewport = page.getViewport({ scale });
+
+                // Configurar canvas con dimensiones exactas
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                canvas.style.width = viewport.width + 'px';
+                canvas.style.height = viewport.height + 'px';
+                canvas.style.display = 'block';
+                canvas.style.margin = '0 auto';
+
+                console.log('Canvas dimensions:', canvas.width, canvas.height);
+                console.log('Viewport scale:', scale);
+
+                const renderContext = {
+                    canvasContext: ctx,
+                    viewport: viewport
+                };
+
+                page.render(renderContext).promise.then(() => {
+                    console.log('PDF rendered, positioning fields...');
+                    positionFieldsDirect();
+                    isRendering = false; // Mark rendering as complete
+                }).catch(err => {
+                    console.error('Error rendering PDF page:', err);
+                    isRendering = false;
+                });
+            });
+        }).catch(err => {
+            console.error("Error cargando PDF:", err);
+            isRendering = false;
+        });
+    }
+
+    // Debounced resize handler
+    window.addEventListener('resize', function () {
+        if (resizeTimer) {
+            clearTimeout(resizeTimer);
+        }
+        resizeTimer = setTimeout(() => {
+            renderPDF(url);
+        }, 300); // Wait 300ms after last resize event
+    });
+
+    // NUEVA FUNCIÓN - Posicionamiento directo y simple
+    function positionFieldsDirect() {
+        console.log('=== STARTING FIELD POSITIONING ===');
+
+        const canvasRect = canvas.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+
+        console.log('Canvas rect:', canvasRect);
+        console.log('Container rect:', containerRect);
+
+        // POSICIONAR EL OVERLAY SOBRE EL CANVAS EXACTAMENTE
+        overlayForm.style.position = 'absolute';
+        overlayForm.style.left = canvasRect.left - containerRect.left + 'px';
+        overlayForm.style.top = canvasRect.top - containerRect.top + 'px';
+        overlayForm.style.width = canvasRect.width + 'px';
+        overlayForm.style.height = canvasRect.height + 'px';
+        overlayForm.style.pointerEvents = 'auto';
+        overlayForm.style.overflow = 'visible';
+
+        console.log('Overlay positioned at:', {
+            left: overlayForm.style.left,
+            top: overlayForm.style.top,
+            width: overlayForm.style.width,
+            height: overlayForm.style.height
+        });
+
+        // POSICIONAR CADA CAMPO
+        for (const key in campos) {
+            const elem = document.getElementById(`campo-${key}`);
+            if (!elem) {
+                console.warn('Element not found:', `campo-${key}`);
+                continue;
+            }
+
+            const pdfPos = campos[key];
+
+            // Calcular posición relativa al PDF original
+            const x_percent = pdfPos.x / pdfOriginal.width;
+            const y_percent = pdfPos.y / pdfOriginal.height;
+
+            // Convertir a píxeles en el canvas renderizado
+            const x_px = x_percent * canvasRect.width;
+            const y_px = y_percent * canvasRect.height;
+
+            // Invertir Y coordinate (PDF vs HTML coordinate system)
+            const top_px = canvasRect.height - y_px;
+
+            console.log(`Field ${key}:`, {
+                pdfPos,
+                percentages: { x_percent, y_percent },
+                calculated: { x_px, y_px, top_px }
+            });
+
+            // Determinar escalas
+            let scaleKey = key;
+            if (key.startsWith('item')) {
+                if (key.includes('_descripcion')) scaleKey = 'item_descripcion';
+                else if (key.includes('_unidad')) scaleKey = 'item_unidad';
+                else if (key.includes('_cantidad')) scaleKey = 'item_cantidad';
+            }
+
+            const { widthScale, heightScale, fontScale } = fieldScales[scaleKey] || { widthScale: 1.0, heightScale: 0.7, fontScale: 1.0 };
+
+            // Calcular dimensiones
+            const width_px = 220 * (canvasRect.width / pdfOriginal.width) * widthScale;
+            const height_px = 26 * (canvasRect.height / pdfOriginal.height) * heightScale;
+
+            // APLICAR ESTILOS DIRECTAMENTE
+            elem.style.position = 'absolute';
+            elem.style.left = x_px + 'px';
+            elem.style.top = (top_px - height_px) + 'px'; // Ajustar para que el campo esté sobre la posición
+            elem.style.width = width_px + 'px';
+            elem.style.height = height_px + 'px';
+            elem.style.boxSizing = 'border-box';
+            elem.style.fontSize = (12 * (canvasRect.height / pdfOriginal.height) * fontScale) + 'px';
+            elem.style.zIndex = '10';
+
+            console.log(`Field ${key} positioned at:`, {
+                left: elem.style.left,
+                top: elem.style.top,
+                width: elem.style.width,
+                height: elem.style.height
+            });
+
+            // DEBUG VISUAL - agregar borde rojo a campos problemáticos
+            if (false) { // Desactivado temporalmente
+                elem.style.border = '2px solid red';
+                console.log(`PROBLEMATIC FIELD ${key}:`, {
+                    position: { x_px, y_px, top_px },
+                    dimensions: { width_px, height_px },
+                    actualStyle: {
+                        left: elem.style.left,
+                        top: elem.style.top,
+                        width: elem.style.width,
+                        height: elem.style.height
+                    }
+                });
+            }
+        }
+
+        console.log('=== FIELD POSITIONING COMPLETE ===');
+    }
+
+    // Iniciar
+    // --- Validation and Auto-Calculation Logic ---
+    document.addEventListener('DOMContentLoaded', function () {
+        // ===== EDIT MODE: Pre-fill data from loaded requisicion =====
+        // ===== EDIT MODE: Pre-fill data from loaded requisicion =====
+        const isEditMode = "{{ edit_mode|yesno:'true,false' }}" === "true";
+
+        if (isEditMode) {
+            console.log('Edit mode activated - loading requisicion data');
+            try {
+                const reqData = JSON.parse('{{ req_data_json|escapejs }}');
+                console.log('Requisicion data:', reqData);
+
+                // Pre-fill products if they exist
+                let productos = [];
+                if (reqData.detalles_productos) {
+                    try {
+                        productos = JSON.parse(reqData.detalles_productos);
+                        console.log('Productos parsed:', productos);
+                    } catch (e) {
+                        console.error('Error parsing detalles_productos:', e);
+                    }
+                } // Close if (detalles_productos) here
+
+                // Logic below runs always (regardless of products)
+
+                const especialidadSelect = document.getElementById('campo-especialidad');
+                if (especialidadSelect) {
+                    // Normalize specialty value to match select options keys (lowercase, no accents usually)
+                    const mapEspecialidad = {
+                        'Plomería': 'plomeria',
+                        'Electricidad': 'electricidad',
+                        'Obra Civil': 'obra civil',
+                        'Vidrio y Canceleria': 'vidrio y canceleria',
+                        'Pintura y Tablaroca': 'pintura y tablaroca',
+                        'Herrería': 'herreria',
+                        'Herramienta': 'herramienta',
+                        'Limpieza': 'limpieza'
+                    };
+
+                    // Try exact match first, then mapped, then lowercase fallback
+                    let val = reqData.especialidad;
+                    if (mapEspecialidad[val]) {
+                        val = mapEspecialidad[val];
+                    } else if (val) {
+                        val = val.toLowerCase();
+                    }
+
+                    especialidadSelect.value = val;
+                    // Lock it permanently for this session as it comes from the bot/DB
+                    especialidadSelect.disabled = true;
+                    especialidadSelect.dataset.systemLocked = "true";
+
+                    // Trigger change event to load products for this specialty
+                    setTimeout(() => {
+                        especialidadSelect.dispatchEvent(new Event('change'));
+
+                        if (productos && productos.length > 0) {
+                            // Wait for products to load, then fill items
+                            setTimeout(() => {
+                                productos.forEach((prod, index) => {
+                                    const i = index + 1;
+                                    if (i <= 14) {
+                                        const descSelect = document.getElementById(`campo-item${i}_descripcion`);
+                                        const unidInput = document.getElementById(`campo-item${i}_unidad`);
+                                        const cantInput = document.getElementById(`campo-item${i}_cantidad`);
+
+                                        if (descSelect) {
+                                            const productName = prod.descripcion || prod.producto_nombre || '';
+                                            descSelect.value = productName;
+                                        }
+                                        if (unidInput) {
+                                            unidInput.value = prod.unidad_nombre || '';
+                                        }
+                                        if (cantInput) {
+                                            cantInput.value = prod.cantidad || '';
+                                        }
+                                    }
+                                });
+                                console.log('Products pre-filled successfully');
+                            }, 800); // Wait for products to load from API
+                        }
+                    }, 100);
+                }
+            } catch (e) {
+                console.error('Error in edit mode initialization:', e);
+            }
+        }
+
+        // Force fecha_soli to today (YYYY-MM-DD format required by HTML5)
+        const fechaSoliInput = document.getElementById('campo-fecha_soli');
+        if (fechaSoliInput) {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            fechaSoliInput.value = `${year}-${month}-${day}`;
+        }
+
+        const numArticulosInput = document.getElementById('campo-numero_de_articulos');
+        if (numArticulosInput) {
+            numArticulosInput.readOnly = true;
+            numArticulosInput.style.backgroundColor = '#e9ecef'; // Visual cue for readonly
+            numArticulosInput.placeholder = "Auto";
+        }
+
+        // --- Dynamic Product Loading ---
+        const especialidadSelect = document.getElementById('campo-especialidad');
+        let productosCache = []; // Store products to finding unit later
+
+        if (especialidadSelect) {
+            especialidadSelect.addEventListener('change', function () {
+                const especialidad = this.value;
+                console.log('Especialidad seleccionada:', especialidad);
+                productosCache = [];
+
+                // Clear all product dropdowns
+                for (let i = 1; i <= 14; i++) {
+                    const descSelect = document.getElementById(`campo-item${i}_descripcion`);
+                    if (descSelect) {
+                        descSelect.innerHTML = '<option value="">--- Selecciona un producto ---</option>';
+                    }
+                }
+
+                if (especialidad) {
+                    const url = `/api/productos/?especialidad=${encodeURIComponent(especialidad)}`;
+                    console.log('Fetching products from:', url);
+
+                    fetch(url)
+                        .then(response => {
+                            console.log('Response status:', response.status);
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log('Productos recibidos:', data);
+                            if (data.productos) {
+                                productosCache = data.productos;
+
+                                // Populate all product dropdowns
+                                for (let i = 1; i <= 14; i++) {
+                                    const descSelect = document.getElementById(`campo-item${i}_descripcion`);
+                                    if (descSelect) {
+                                        data.productos.forEach(prod => {
+                                            const option = document.createElement('option');
+                                            option.value = prod.nombre;
+                                            option.textContent = prod.nombre;
+                                            option.dataset.unidad = prod.unidad;
+                                            descSelect.appendChild(option);
+                                        });
+                                    }
+                                }
+                                console.log(`${data.productos.length} productos agregados a los dropdowns`);
+                            } else {
+                                console.warn('No se encontró la propiedad "productos" en la respuesta');
+                            }
+                        })
+                        .catch(err => {
+                            console.error('Error fetching products:', err);
+                        });
+                }
+            });
+        }
+
+        // --- Auto-fill Unit Logic ---
+        // Add listeners to all description SELECT fields
+        for (let i = 1; i <= 14; i++) {
+            const descSelect = document.getElementById(`campo-item${i}_descripcion`);
+            const unitInput = document.getElementById(`campo-item${i}_unidad`);
+
+            if (descSelect && unitInput) {
+                descSelect.addEventListener('change', function () {
+                    const selectedOption = this.options[this.selectedIndex];
+                    if (selectedOption && selectedOption.dataset.unidad) {
+                        unitInput.value = selectedOption.dataset.unidad;
+                    } else {
+                        unitInput.value = '';
+                    }
+                });
+            }
+        }
+
+        // --- Lock Especialidad when products are selected ---
+        function checkAndLockEspecialidad() {
+            let hasProducts = false;
+            for (let i = 1; i <= 14; i++) {
+                const descSelect = document.getElementById(`campo-item${i}_descripcion`);
+                if (descSelect && descSelect.value && descSelect.value.trim() !== '') {
+                    hasProducts = true;
+                    break;
+                }
+            }
+
+            if (hasProducts && especialidadSelect) {
+                especialidadSelect.disabled = true;
+                especialidadSelect.style.backgroundColor = '#e9ecef';
+                especialidadSelect.style.cursor = 'not-allowed';
+            } else if (especialidadSelect) {
+                // Only unlock if NOT locked by system (edit mode)
+                if (especialidadSelect.dataset.systemLocked !== "true") {
+                    especialidadSelect.disabled = false;
+                    especialidadSelect.style.backgroundColor = '';
+                    especialidadSelect.style.cursor = '';
+                }
+            }
+        }
+
+        // Add listeners to all description fields for locking
+        for (let i = 1; i <= 14; i++) {
+            const descSelect = document.getElementById(`campo-item${i}_descripcion`);
+            if (descSelect) {
+                descSelect.addEventListener('change', checkAndLockEspecialidad);
+            }
+        }
+
+        const form = document.getElementById('form-overlay');
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                let count = 0;
+                // Count items with description
+                for (let i = 1; i <= 14; i++) {
+                    const descSelect = document.getElementById(`campo-item${i}_descripcion`);
+                    // Also check quantity if needed, but description is primary key
+                    if (descSelect && descSelect.value && descSelect.value.trim() !== '') {
+                        count++;
+                    }
+                }
+
+                // Validation: Min 1 item
+                if (count === 0) {
+                    e.preventDefault();
+                    alert('¡Atención! Debes agregar al menos un artículo (descripción) para generar la requisición.');
+                    return;
+                }
+
+                // Validation: Date Max Range (2 weeks)
+                const fechaSoliVal = document.getElementById('campo-fecha_soli').value;
+                const fechaUtilVal = document.getElementById('campo-fecha_util').value;
+
+                if (fechaSoliVal && fechaUtilVal) {
+                    const fSoli = new Date(fechaSoliVal + 'T00:00:00'); // Force local time handling
+                    const fUtil = new Date(fechaUtilVal + 'T00:00:00');
+
+                    // Note: fUtil - fSoli gives milliseconds
+
+                    if (fUtil < fSoli) {
+                        e.preventDefault();
+                        alert('Error: La fecha de utilidad no puede ser anterior a la de solicitud.');
+                        return;
+                    }
+
+                    // 14 days in milliseconds = 14 * 24 * 60 * 60 * 1000
+                    const maxDiff = 14 * 24 * 60 * 60 * 1000;
+                    if ((fUtil - fSoli) > maxDiff) {
+                        e.preventDefault();
+                        alert('Error: La fecha de utilidad no puede exceder las 2 semanas desde la solicitud.');
+                        return;
+                    }
+                }
+
+                // Update field before submit
+                if (numArticulosInput) {
+                    numArticulosInput.value = count;
+                }
+
+                // Enable especialidad if disabled, so it is sent in POST
+                if (especialidadSelect) {
+                    especialidadSelect.disabled = false;
+                }
+
+                // Allow submit to proceed
+            });
+        }
+    });
+
+    setTimeout(() => renderPDF(url), 100);
+</script>
+{% endblock %}

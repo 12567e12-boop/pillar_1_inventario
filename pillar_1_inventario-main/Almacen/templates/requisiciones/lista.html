@@ -1,0 +1,113 @@
+{% extends "requisiciones/base_requisicion.html" %}
+{% load humanize %}
+
+{% block page_title %}Mis Requisiciones{% endblock %}
+
+{% block page_actions %}
+    <a href="{% url 'crear_requisicion' %}" class="btn btn-sm btn-outline-primary">
+        <i class="fas fa-plus"></i> Nueva Requisición
+    </a>
+{% endblock %}
+
+{% block requisicion_content %}
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="tabla-requisiciones">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Obra</th>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                        <th>Productos</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for req in requisiciones %}
+                    <tr>
+                        <td>
+                            <strong>{{ req.id }}</strong>
+                            <div class="text-muted small">{{ req.get_especialidad_display }}</div>
+                        </td>
+                        <td>
+                            {{ req.obra }}
+                            {% if req.bloque %}
+                            <div class="text-muted small">Bloque: {{ req.bloque.nombre }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ req.fecha_soli|date:"d/m/Y" }}
+                            <div class="text-muted small">{{ req.fecha_soli|timesince }}</div>
+                        </td>
+                        <td>
+                            <span class="badge {% if req.estado == 'pendiente' %}bg-warning
+                                            {% elif req.estado == 'supervisor' %}bg-info
+                                            {% elif req.estado == 'autorizada' %}bg-success
+                                            {% elif req.estado == 'rechazada' %}bg-danger
+                                            {% else %}bg-secondary{% endif %}">
+                                {{ req.get_estado_display }}
+                            </span>
+                            {% if req.autorizado_supervisor %}
+                            <div class="small text-success">Aprobado por supervisor</div>
+                            {% endif %}
+                            {% if req.autorizado_directivo %}
+                            <div class="small text-success">Aprobado por directivo</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% with productos=req.obtener_productos %}
+                                {{ productos|length }} producto{{ productos|length|pluralize }}
+                            {% endwith %}
+                        </td>
+                        <td class="text-end">
+                            <a href="{% url 'detalle_requisicion' req.token_publico %}" 
+                               class="btn btn-sm btn-outline-primary"
+                               title="Ver detalles">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            {% if req.estado == 'pendiente' or req.estado == 'supervisor' %}
+                            <a href="#" class="btn btn-sm btn-outline-secondary"
+                               title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4">
+                            <div class="text-muted">
+                                <i class="fas fa-inbox fa-3x mb-3"></i>
+                                <p class="h5">No hay requisiciones registradas</p>
+                                <p>Crea tu primera requisición haciendo clic en el botón "Nueva Requisición"</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+$(document).ready(function() {
+    // Inicializar DataTable
+    $('#tabla-requisiciones').DataTable({
+        order: [[2, 'desc']], // Ordenar por fecha descendente por defecto
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.10.25/i18n/Spanish.json'
+        },
+        responsive: true,
+        columnDefs: [
+            { orderable: false, targets: [5] } // Deshabilitar ordenación en columna de acciones
+        ]
+    });
+});
+</script>
+{% endblock %}

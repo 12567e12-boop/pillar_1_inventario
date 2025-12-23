@@ -1,0 +1,263 @@
+{% extends "requisiciones/base_requisicion.html" %}
+{% load humanize %}
+{% load requisicion_filters %}
+
+{% block page_title %}Requisición {{ requisicion.id }}{% endblock %}
+
+{% block page_actions %}
+    <a href="{% url 'lista_requisiciones' %}" class="btn btn-sm btn-outline-secondary me-2">
+        <i class="fas fa-arrow-left"></i> Volver
+    </a>
+    {% if requisicion.estado == 'pendiente' or requisicion.estado == 'supervisor' %}
+    <a href="#" class="btn btn-sm btn-outline-primary me-2">
+        <i class="fas fa-edit"></i> Editar
+    </a>
+    {% endif %}
+    <a href="#" class="btn btn-sm btn-outline-secondary" onclick="window.print()">
+        <i class="fas fa-print"></i> Imprimir
+    </a>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Detalles de la Requisición</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <p class="mb-1"><strong>Obra:</strong> {{ requisicion.obra }}</p>
+                        <p class="mb-1"><strong>Ubicación:</strong> {{ requisicion.ubicacion }}</p>
+                        <p class="mb-1"><strong>Bloque:</strong> {{ requisicion.bloque.nombre|default:"No especificado" }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="mb-1"><strong>Estado:</strong> 
+                            <span class="badge bg-{{ requisicion.estado|get_estado_badge }}">
+                                {{ requisicion.get_estado_display }}
+                            </span>
+                        </p>
+                        <p class="mb-1"><strong>Fecha de solicitud:</strong> {{ requisicion.fecha_soli|date:"d/m/Y" }}</p>
+                        <p class="mb-1"><strong>Fecha requerida:</strong> {{ requisicion.fecha_util|date:"d/m/Y"|default:"No especificada" }}</p>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <h6>Productos solicitados:</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Producto</th>
+                                    <th class="text-end">Cantidad</th>
+                                    <th>Unidad</th>
+                                    <th>Descripción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for detalle in productos %}
+                                <tr>
+                                    <td>{{ forloop.counter }}</td>
+                                    <td>{{ detalle.producto.nombre }}</td>
+                                    <td class="text-end">{{ detalle.cantidad|floatformat:2 }}</td>
+                                    <td>{{ detalle.unidad.nombre }}</td>
+                                    <td>{{ detalle.descripcion|default:"-" }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                {% if requisicion.observaciones %}
+                <div class="mb-3">
+                    <h6>Observaciones:</h6>
+                    <div class="border rounded p-3 bg-light">
+                        {{ requisicion.observaciones|linebreaks }}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if requisicion.imagen %}
+                <div class="mb-3">
+                    <h6>Imagen adjunta:</h6>
+                    <img src="{{ requisicion.imagen.url }}" alt="Imagen de la requisición" class="img-fluid rounded" style="max-height: 300px;">
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Tarjeta de estado y acciones -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Estado y Acciones</h5>
+            </div>
+            <div class="card-body">
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-badge bg-{% if requisicion.estado == 'pendiente' %}primary{% else %}secondary{% endif %}">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="timeline-content">
+                            <h6>Pendiente</h6>
+                            <small class="text-muted">Creada el {{ requisicion.fecha_soli|date:"d/m/Y H:i" }}</small>
+                        </div>
+                    </div>
+                    
+                    {% if requisicion.estado != 'pendiente' %}
+                    <div class="timeline-item">
+                        <div class="timeline-badge bg-{% if requisicion.estado == 'supervisor' %}primary{% else %}secondary{% endif %}">
+                            <i class="fas fa-user-check"></i>
+                        </div>
+                        <div class="timeline-content">
+                            <h6>Aprobado por supervisor</h6>
+                            <small class="text-muted">
+                                {% if requisicion.autorizado_supervisor %}
+                                    Aprobado el {{ requisicion.updated_at|date:"d/m/Y H:i" }}
+                                {% else %}
+                                    Pendiente de aprobación
+                                {% endif %}
+                            </small>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if requisicion.estado == 'autorizada' or requisicion.estado == 'surtida' or requisicion.estado == 'cerrada' %}
+                    <div class="timeline-item">
+                        <div class="timeline-badge bg-{% if requisicion.estado == 'autorizada' %}primary{% else %}secondary{% endif %}">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="timeline-content">
+                            <h6>Aprobado por directivo</h6>
+                            <small class="text-muted">
+                                Aprobado el {{ requisicion.updated_at|date:"d/m/Y H:i" }}
+                            </small>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="mt-4">
+                    {% if requisicion.estado == 'pendiente' and perms.Almacen.aprobar_requisicion %}
+                    <form method="post" action="{% url 'aprobar_requisicion_supervisor' requisicion.token_publico %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-success w-100 mb-2">
+                            <i class="fas fa-check-circle"></i> Aprobar como supervisor
+                        </button>
+                    </form>
+                    
+                    <button type="button" class="btn btn-outline-danger w-100 mb-2" data-bs-toggle="modal" data-bs-target="#rechazarModal">
+                        <i class="fas fa-times-circle"></i> Rechazar
+                    </button>
+                    {% endif %}
+                    
+                    {% if requisicion.estado == 'supervisor' and perms.Almacen.aprobar_requisicion_directivo %}
+                    <form method="post" action="{% url 'aprobar_requisicion_directivo' requisicion.token_publico %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-success w-100 mb-2">
+                            <i class="fas fa-check-double"></i> Aprobar como directivo
+                        </button>
+                    </form>
+                    {% endif %}
+                    
+                    {% if requisicion.estado == 'autorizada' and perms.Almacen.surtir_requisicion %}
+                    <button type="button" class="btn btn-primary w-100 mb-2">
+                        <i class="fas fa-truck-loading"></i> Marcar como surtida
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Información del solicitante -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Solicitante</h5>
+            </div>
+            <div class="card-body">
+                {% if requisicion.solicitante %}
+                <div class="d-flex align-items-center mb-3">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-user-circle fa-3x text-muted"></i>
+                    </div>
+                    <div class="ms-3">
+                        <h6 class="mb-0">{{ requisicion.solicitante.nombre_completo }}</h6>
+                        <small class="text-muted">{{ requisicion.solicitante.puesto|default:"Solicitante" }}</small>
+                    </div>
+                </div>
+                <ul class="list-unstyled">
+                    {% if requisicion.solicitante.departamento %}
+                    <li class="mb-1">
+                        <i class="fas fa-building text-muted me-2"></i>
+                        {{ requisicion.solicitante.departamento }}
+                    </li>
+                    {% endif %}
+                    {% if requisicion.solicitante.telefono %}
+                    <li class="mb-1">
+                        <i class="fas fa-phone text-muted me-2"></i>
+                        {{ requisicion.solicitante.telefono }}
+                    </li>
+                    {% endif %}
+                    {% if requisicion.solicitante.email %}
+                    <li class="mb-1">
+                        <i class="fas fa-envelope text-muted me-2"></i>
+                        {{ requisicion.solicitante.email }}
+                    </li>
+                    {% endif %}
+                </ul>
+                {% else %}
+                <p class="mb-0">{{ requisicion.solicitante_nombre|default:"No especificado" }}</p>
+                {% endif %}
+            </div>
+    </div>
+</div>
+
+<!-- Modal para rechazar requisición -->
+<div class="modal fade" id="rechazarModal" tabindex="-1" aria-labelledby="rechazarModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="rechazarModalLabel">Rechazar Requisición</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="{% url 'rechazar_requisicion' requisicion.token_publico %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <p>¿Está seguro de que desea rechazar esta requisición?</p>
+                    <div class="mb-3">
+                        <label for="motivo" class="form-label">Motivo del rechazo:</label>
+                        <textarea class="form-control" id="motivo" name="motivo" rows="3" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger">Confirmar Rechazo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+// Scripts específicos para la vista de detalle
+$(document).ready(function() {
+    // Inicializar tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+    
+    // Configuración para impresión
+    $('.btn-print').on('click', function() {
+        window.print();
+    });
+});
+</script>
+{% endblock %}

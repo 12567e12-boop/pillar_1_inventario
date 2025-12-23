@@ -1,0 +1,245 @@
+{% extends "requisiciones/base_requisicion.html" %}
+{% load static %}
+
+{% block page_title %}Nueva Requisición{% endblock %}
+
+{% block page_actions %}
+    <a href="{% url 'lista_requisiciones' %}" class="btn btn-sm btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Cancelar
+    </a>
+{% endblock %}
+
+{% block requisicion_content %}
+<div class="card">
+    <div class="card-body">
+        <form id="requisicionForm" method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <!-- Sección de información general -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Información General</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="obra" class="form-label">Obra <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="obra" name="obra" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="ubicacion" class="form-label">Ubicación <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="ubicacion" name="ubicacion" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="bloque" class="form-label">Bloque</label>
+                                <select class="form-select" id="bloque" name="bloque">
+                                    <option value="">Seleccione un bloque...</option>
+                                    {% for bloque in bloques %}
+                                    <option value="{{ bloque.id }}">{{ bloque.nombre }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="especialidad" class="form-label">Especialidad <span class="text-danger">*</span></label>
+                                <select class="form-select" id="especialidad" name="especialidad" required>
+                                    <option value="">Seleccione una especialidad...</option>
+                                    {% for value, label in especialidades.items %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="fecha_util" class="form-label">Fecha Requerida</label>
+                                <input type="date" class="form-control" id="fecha_util" name="fecha_util" 
+                                       min="{{ today|date:'Y-m-d' }}">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="solicitante" class="form-label">Solicitante</label>
+                                <select class="form-select" id="solicitante" name="solicitante">
+                                    <option value="">Seleccione un solicitante...</option>
+                                    {% for empleado in empleados %}
+                                    <option value="{{ empleado.id }}">{{ empleado.nombre_completo }}</option>
+                                    {% endfor %}
+                                </select>
+                                <div class="form-text">O ingrese manualmente:</div>
+                                <input type="text" class="form-control mt-2" id="solicitante_nombre" name="solicitante_nombre" 
+                                       placeholder="Nombre del solicitante">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="observaciones" class="form-label">Observaciones</label>
+                        <textarea class="form-control" id="observaciones" name="observaciones" rows="2"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="imagen" class="form-label">Imagen de respaldo</label>
+                        <input class="form-control" type="file" id="imagen" name="imagen" accept="image/*" capture="camera">
+                        <div class="form-text">Tome una foto o suba una imagen de respaldo para esta requisición.</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sección de productos -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Productos a solicitar</h5>
+                    <button type="button" class="btn btn-sm btn-primary" id="agregarProducto">
+                        <i class="fas fa-plus"></i> Agregar Producto
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table" id="tablaProductos">
+                            <thead>
+                                <tr>
+                                    <th style="width: 5%;">#</th>
+                                    <th style="width: 40%;">Producto</th>
+                                    <th style="width: 15%;">Cantidad</th>
+                                    <th style="width: 15%;">Unidad</th>
+                                    <th style="width: 20%;">Descripción</th>
+                                    <th style="width: 5%;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="productosContainer">
+                                <!-- Los productos se agregarán aquí dinámicamente -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="text-muted text-center py-3" id="sinProductos">
+                        <i class="fas fa-inbox fa-3x mb-2"></i>
+                        <p>No hay productos agregados</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Botones de acción -->
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <a href="{% url 'lista_requisiciones' %}" class="btn btn-outline-secondary me-md-2">
+                    <i class="fas fa-times"></i> Cancelar
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Guardar Requisición
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Plantilla para fila de producto (oculta) -->
+<template id="productoRowTemplate">
+    <tr>
+        <td class="align-middle">
+            <span class="numeroFila">1</span>
+        </td>
+        <td>
+            <select class="form-select producto-select" name="productos[]" required>
+                <option value="">Seleccione un producto...</option>
+                {% for producto in productos %}
+                <option value="{{ producto.id }}" data-unidad="{{ producto.unidad.id }}">
+                    {{ producto.nombre }} ({{ producto.unidad.nombre }})
+                </option>
+                {% endfor %}
+            </select>
+        </td>
+        <td>
+            <input type="number" class="form-control cantidad" name="cantidades[]" min="0.01" step="0.01" required>
+        </td>
+        <td>
+            <select class="form-select unidad-select" name="unidades[]" required>
+                <option value="">Seleccione...</option>
+                {% for unidad in unidades %}
+                <option value="{{ unidad.id }}">{{ unidad.nombre }}</option>
+                {% endfor %}
+            </select>
+        </td>
+        <td>
+            <input type="text" class="form-control" name="descripciones[]" placeholder="Descripción (opcional)">
+        </td>
+        <td class="text-center align-middle">
+            <button type="button" class="btn btn-sm btn-outline-danger btn-eliminar">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    </tr>
+</template>
+{% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script src="{% static 'js/requisiciones/crear.js' %}"></script>
+<script>
+// Configuración global
+const UNIDADES = {
+    {% for unidad in unidades %}
+    '{{ unidad.id }}': '{{ unidad.nombre }}',
+    {% endfor %}
+};
+
+const ESPECIALIDADES = {
+    {% for value, label in especialidades.items %}
+    '{{ value }}': '{{ label }}',
+    {% endfor %}
+};
+
+// Configuración de DataTables para búsqueda de productos
+$(document).ready(function() {
+    // Inicializar select2 para búsqueda de productos
+    $('.producto-select').select2({
+        placeholder: 'Buscar producto...',
+        allowClear: true,
+        width: '100%'
+    });
+    
+    // Actualizar unidades cuando se selecciona un producto
+    $(document).on('change', '.producto-select', function() {
+        const row = $(this).closest('tr');
+        const unidadId = $(this).find('option:selected').data('unidad');
+        const unidadSelect = row.find('.unidad-select');
+        
+        if (unidadId) {
+            unidadSelect.val(unidadId).trigger('change');
+            unidadSelect.prop('disabled', true);
+        } else {
+            unidadSelect.prop('disabled', false);
+        }
+    });
+    
+    // Filtrar productos por especialidad
+    $('#especialidad').on('change', function() {
+        const especialidad = $(this).val();
+        // Aquí iría la lógica para filtrar productos por especialidad
+        // usando una petición AJAX o mostrando/ocultando opciones
+    });
+    
+    // Manejar el envío del formulario
+    $('#requisicionForm').on('submit', function(e) {
+        const productosCount = $('#productosContainer tr').length;
+        if (productosCount === 0) {
+            e.preventDefault();
+            alert('Debe agregar al menos un producto a la requisición.');
+            return false;
+        }
+        
+        // Validar que no haya más de 14 productos
+        if (productosCount > 14) {
+            e.preventDefault();
+            alert('No se pueden agregar más de 14 productos a una requisición.');
+            return false;
+        }
+        
+        // Mostrar loader o mensaje de procesamiento
+        $('button[type="submit"]').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Procesando...');
+    });
+});
+</script>
+{% endblock %}

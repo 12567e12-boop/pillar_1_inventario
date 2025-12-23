@@ -1,0 +1,14 @@
+version: 3
+
+tunnels:
+  inventario:
+    authtoken: 36VfOI51IAbaXSAMiGaviOGFwWy_3an7PbS4Rs8fifNfybXCk
+    proto: http
+    addr: 8000
+    host_header: "localhost:8000"
+    
+  dreacht-hub:
+    authtoken: 2tDrw1wr4rtFSnCZx9j4YO7YICS_6CDRUgpcNQpMhv4MRnHDg
+    proto: http
+    addr: 8001
+    host_header: "localhost:8001"

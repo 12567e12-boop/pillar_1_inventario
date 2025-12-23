@@ -1,0 +1,325 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block extrahead %}
+{{ block.super }}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<style>
+    /* Estilo para el campo de solo lectura */
+    select[readonly].readonly-specialidad {
+        background-color: #f8f9fa;
+        cursor: not-allowed;
+        opacity: 0.8;
+    }
+    select[readonly].readonly-specialidad option {
+        color: #6c757d;
+    }
+</style>
+<script>
+$(document).ready(function() {
+    // Función para agregar un nuevo producto
+    function addProduct() {
+        const especialidad = $('#id_especialidad').val();
+        const productRow = `
+            <tr class="product-row">
+                <td>
+                    <select name="producto" class="form-control producto-select" required>
+                        <option value="">Seleccione un producto</option>
+                    </select>
+                </td>
+                <td><input type="number" name="cantidad" class="form-control" step="0.01" min="0.01" required></td>
+                <td class="unidad-cell">
+                    <select name="unidad" class="form-control unidad-select" required disabled>
+                        <option value="">Seleccione una unidad</option>
+                        {% for unidad in unidades %}
+                        <option value="{{ unidad.id }}">{{ unidad.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </td>
+                <td class="text-center">
+                    <input type="checkbox" name="surtido" class="form-check-input" value="true">
+                </td>
+                <td><button type="button" class="btn btn-danger remove-product">Eliminar</button></td>
+            </tr>
+        `;
+        const $newRow = $(productRow);
+        $('#productos-table tbody').append($newRow);
+        
+        // Cargar productos si ya hay una especialidad seleccionada
+        if (especialidad) {
+            cargarProductosPorEspecialidad(especialidad, $newRow.find('.producto-select'));
+        }
+    }
+
+    // Función para cargar productos por especialidad
+    function cargarProductosPorEspecialidad(especialidad, $select) {
+        if (!especialidad) {
+            $select.html('<option value="">Seleccione una especialidad primero</option>');
+            return;
+        }
+        
+        // Mostrar indicador de carga
+        $select.html('<option value="">Cargando productos...</option>');
+        
+        // Deshabilitar el select mientras se cargan los datos
+        $select.prop('disabled', true);
+        
+        // Hacer la petición AJAX
+        $.ajax({
+            url: `/admin/Almacen/requisicion/get-productos-por-especialidad/${especialidad}/`,
+            method: 'GET',
+            success: function(data) {
+                // Limpiar opciones actuales
+                $select.html('<option value="">Seleccione un producto</option>');
+                
+                if (data.length === 0) {
+                    $select.append('<option value="">No hay productos disponibles para esta especialidad</option>');
+                } else {
+                    // Separar productos por tipo
+                    const productosEspecialidad = [];
+                    const productosConsumibles = [];
+                    
+                    data.forEach(function(producto) {
+                        if (producto.especialidad === 'consumible') {
+                            productosConsumibles.push(producto);
+                        } else {
+                            productosEspecialidad.push(producto);
+                        }
+                    });
+                    
+                    // Agregar productos de la especialidad primero
+                    if (productosEspecialidad.length > 0) {
+                        // Agregar encabezado de sección
+                        $select.append(new Option(
+                            '--- ' + $select.closest('tr').find('select[name$="-especialidad"] option:selected').text() + ' ---',
+                            '',
+                            false,
+                            false
+                        ));
+                        
+                        // Agregar productos de la especialidad
+                        productosEspecialidad.forEach(function(producto) {
+                            $select.append(new Option(
+                                `• ${producto.nombre} (${producto.unidad__nombre || 'Sin unidad'})`,
+                                producto.id,
+                                false,
+                                false
+                            ));
+                        });
+                    }
+                    
+                    // Agregar productos consumibles después
+                    if (productosConsumibles.length > 0) {
+                        // Agregar separador
+                        $select.append(new Option(
+                            '--- CONSUMIBLES ---',
+                            '',
+                            false,
+                            false
+                        ));
+                        
+                        // Agregar productos consumibles
+                        productosConsumibles.forEach(function(producto) {
+                            $select.append(new Option(
+                                `• ${producto.nombre} (${producto.unidad__nombre || 'Sin unidad'})`,
+                                producto.id,
+                                false,
+                                false
+                            ));
+                        });
+                    }
+                }
+                
+                // Habilitar el select
+                $select.prop('disabled', false);
+                
+                // Si hay un valor seleccionado, restaurarlo
+                if ($select.data('current-value')) {
+                    $select.val($select.data('current-value'));
+                }
+            },
+            error: function() {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudieron cargar los productos. Por favor, recarga la página e intenta de nuevo.'
+                });
+                $select.html('<option value="">Error al cargar productos</option>');
+                $select.prop('disabled', false);
+            }
+        });
+    }
+    
+    // Actualizar productos cuando cambia la especialidad
+    $('#id_especialidad').change(function() {
+        const especialidad = $(this).val();
+        
+        // Si no hay especialidad seleccionada, limpiar los selects
+        if (!especialidad) {
+            $('.producto-select').html('<option value="">Seleccione una especialidad</option>').prop('disabled', true);
+            $('.unidad-select').prop('disabled', true);
+            return;
+        }
+        
+        // Mostrar mensaje de carga en todos los selects
+        $('.producto-select').each(function() {
+            const $select = $(this);
+            $select.html('<option value="">Cargando productos...</option>');
+            cargarProductosPorEspecialidad(especialidad, $select);
+        });
+    });
+    
+    // Manejar cambio de producto para actualizar la unidad
+    $(document).on('change', '.producto-select', function() {
+        const $row = $(this).closest('tr');
+        const $unidadSelect = $row.find('.unidad-select');
+        
+        // Habilitar el select de unidad cuando se selecciona un producto
+        if ($(this).val()) {
+            $unidadSelect.prop('disabled', false);
+        } else {
+            $unidadSelect.prop('disabled', true);
+        }
+    });
+    
+    // Cargar productos iniciales
+    const especialidadInicial = $('#id_especialidad').val();
+    if (especialidadInicial) {
+        cargarProductosPorEspecialidad(especialidadInicial, $('.producto-select'));
+    }
+    
+    // Manejar clic en el botón de agregar producto
+    $('#add-product').click(function(e) {
+        e.preventDefault();
+        if ($('.product-row').length < 14) {
+            addProduct();
+            // Asegurarse de que los productos se filtren correctamente al agregar
+            $('#id_especialidad').trigger('change');
+        } else {
+            alert('No se pueden agregar más de 14 productos');
+        }
+    });
+
+    // Manejar eliminación de productos
+    $(document).on('click', '.remove-product', function() {
+        $(this).closest('tr').remove();
+    });
+
+    // Manejar envío del formulario
+    $('form').on('submit', function(e) {
+        const productos = [];
+        $('.product-row').each(function() {
+            const $row = $(this);
+            productos.push({
+                producto_id: $row.find('select[name="producto"]').val(),
+                producto_nombre: $row.find('select[name="producto"] option:selected').text(),
+                cantidad: parseFloat($row.find('input[name="cantidad"]').val()),
+                unidad_id: $row.find('select[name="unidad"]').val(),
+                unidad_nombre: $row.find('select[name="unidad"] option:selected').text(),
+                surtido: $row.find('input[name="surtido"]').is(':checked')
+            });
+        });
+
+        // Actualizar el campo oculto con los productos
+        $('#id_detalles_productos').val(JSON.stringify(productos));
+    });
+
+    // Cargar productos existentes si estamos editando
+    const detallesProductos = JSON.parse('{{ detalles_productos|escapejs }}' || '[]');
+    const especialidadActual = '{{ especialidad_actual|escapejs }}';
+    
+    if (detallesProductos && detallesProductos.length > 0) {
+        // Función para cargar un producto
+        const cargarProducto = function(index) {
+            if (index >= detallesProductos.length) return;
+            
+            const detalle = detallesProductos[index];
+            addProduct();
+            const $lastRow = $('.product-row').last();
+            const $select = $lastRow.find('select[name="producto"]');
+            
+            // Guardar el valor actual para restaurarlo después
+            $select.data('current-value', detalle.producto_id);
+            
+            // Cargar los productos para la especialidad actual
+            cargarProductosPorEspecialidad(especialidadActual, $select);
+            
+            // Una vez que se carguen los productos, establecer los valores
+            const checkValues = setInterval(function() {
+                if ($select.find('option[value="' + detalle.producto_id + '"]').length > 0) {
+                    clearInterval(checkValues);
+                    
+                    // Establecer los valores del producto
+                    $select.val(detalle.producto_id);
+                    $lastRow.find('input[name="cantidad"]').val(detalle.cantidad);
+                    $lastRow.find('select[name="unidad"]').val(detalle.unidad_id);
+                    
+                    // Establecer el estado del checkbox de surtido
+                    if (detalle.surtido) {
+                        $lastRow.find('input[name="surtido"]').prop('checked', true);
+                    }
+                    
+                    // Cargar el siguiente producto
+                    setTimeout(() => cargarProducto(index + 1), 100);
+                }
+            }, 100);
+        };
+        
+        // Iniciar la carga de productos
+        cargarProducto(0);
+    }
+});
+</script>
+{% endblock %}
+
+{% block field_sets %}
+{{ block.super }}
+
+<div class="module aligned">
+    <h2>Productos</h2>
+    
+    <div class="form-row">
+        <div class="field-box">
+            <table id="productos-table" class="table">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Cantidad</th>
+                        <th>Unidad</th>
+                        <th>Surtido</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Los productos se agregarán aquí dinámicamente -->
+                </tbody>
+            </table>
+            
+            <div class="form-group">
+                <button type="button" id="add-product" class="btn btn-info">
+                    <i class="fa fa-plus"></i> Agregar Producto
+                </button>
+                <span class="help">Máximo 14 productos por requisición</span>
+            </div>
+            
+            <!-- Campo oculto para almacenar los datos de los productos -->
+            {{ adminform.form.detalles_productos }}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block after_field_sets %}
+{{ block.super }}
+<style>
+    .product-row { background-color: #f8f9fa; margin-bottom: 5px; }
+    .product-row td { padding: 8px; }
+    .form-row { margin-bottom: 15px; }
+    .field-box { width: 100%; }
+    table { width: 100%; margin-bottom: 20px; }
+    th { background-color: #f1f1f1; padding: 10px; text-align: left; }
+    td { padding: 8px; vertical-align: middle; }
+    .form-control { width: 100%; }
+</style>
+{% endblock %}
