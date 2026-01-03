@@ -5,7 +5,7 @@ cls
 REM ==== Configuración inicial ====
 cd /d "%~dp0"
 
-REM Activar entorno virtual
+
 call laZona\Scripts\activate
 
 REM ==== Crear backup de la base de datos ====
