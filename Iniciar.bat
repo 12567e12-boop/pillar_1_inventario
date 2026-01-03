@@ -29,10 +29,10 @@ REM ==== Esperar 3 segundos para que el servidor cargue ====
 timeout 3 > nul
 
 REM ==== Abrir navegador ====
-start "" "http://127.0.0.1:8002"
+start "" "http://127.0.0.1:8001"
 
 REM ==== Iniciar ngrok en otra ventana ====
-start cmd /k "ngrok http 8002"
+start cmd /k "ngrok http 8001"
 
 REM ==== Iniciar bot de Telegram en otra ventana ====
 start cmd /k "python manage.py run_telegram_bot"
