@@ -1,0 +1,737 @@
+{% load static %}
+
+<link rel="stylesheet" href="{% static 'css/select2v4/select2.min.css' %}" />
+<div id="dashboard" class="dashboard">
+    <div class="row">
+        <div class="col-xs-12 col-lg-6">
+            <div class="panel panel-light">
+                <div class="panel-heading">
+                    <div class="panel-title">
+                        <i class="fa fa-list-alt"></i> Registrar entrada o salida de productos
+                    </div>
+                </div>
+                <div class="panel-body">
+                    {% if perms.Almacen.can_use_register_form %}
+                    <form class="form" role="form" id="form-registro" method="post" action="{% url 'registro_add' %}">
+                        <div class="form-group">
+                            <label class="control-label">Bloque</label>
+                            <select name="bloque" id="id-bloque" class="form-control select2-registro"
+                                data-maximum-input-length="35" data-placeholder="Elegir bloque">
+                                <option></option>
+                                {% for p in bloques %}
+                                <option>{{ p }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="control-label">Empleado</label>
+                            <select name="empleado" id="id-empleado" class="form-control select2-registro"
+                                data-maximum-input-length="50" data-placeholder="Elegir empleado">
+                                <option></option>
+                                {% for p in empleados %}
+                                <option>{{ p }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="row">
+                            <div class="form-group col-xs-12 col-md-12" id="id-group-producto">
+                                <label class="control-label">Producto</label>
+                                <select name="producto" id="id-producto" class="form-control select2-registro"
+                                    data-maximum-input-length="100" data-placeholder="Elegir producto">
+                                    <option></option>
+                                    {% for p in productos %}
+                                    <option>{{ p }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group col-xs-12 col-md-4 hidden" id="id-group-unidad">
+                                <label class="control-label">Unidad</label>
+                                <select name="unidad" id="id-unidad" class="form-control select2-registro"
+                                    data-maximum-input-length="50" data-placeholder="Elegir unidad">
+                                    <option></option>
+                                    {% for p in unidades %}
+                                    <option>{{ p }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="form-group col-xs-12 col-md-6">
+                                <label class="control-label">Cantidad</label>
+                                <input name="cantidad" id="id-cantidad" type="number" step="0.01" class="form-control"
+                                    placeholder="Escriba la cantidad">
+                            </div>
+                            <div class="form-group col-xs-12 col-md-6">
+                                <label class="control-label">Tipo</label>
+                                <select name="tipo" class="form-control">
+                                    <option value="1" selected>Entrada</option>
+                                    <option value="0">Salida</option>
+                                    <option value="-1">Prestado</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button id="id-btn-save" class="btn btn-primary pull-right" type="submit">Guardar</a>
+                    </form>
+                    {% else %}
+                    <div class="callout callout-danger">
+                        <p>No tienes permisos para utilizar este formulario.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-xs-12 col-lg-6">
+            <div class="panel panel-light">
+                <div class="panel-heading">
+                    <div class="panel-title">
+                        <i class="fa fa-list-alt"></i> Mover productos entre bloques
+                    </div>
+                </div>
+                <div class="panel-body">
+                    {% if perms.Almacen.can_use_register_form %}
+                    <form class="form" role="form" id="form-transferencia" method="post" action="{% url 'producto_transferir' %}">
+                        <div class="form-group">
+                            <label class="control-label">Bloque de origen</label>
+                            <select name="bloque_origen" id="id-bloque-origen" class="form-control select2-transferencia"
+                                data-maximum-input-length="35" data-placeholder="Elegir bloque de origen">
+                                <option></option>
+                                {% for p in bloques %}
+                                <option>{{ p }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="control-label">Bloque de destino</label>
+                            <select name="bloque_destino" id="id-bloque-destino" class="form-control select2-transferencia"
+                                data-maximum-input-length="35" data-placeholder="Elegir bloque de destino">
+                                <option></option>
+                                {% for p in bloques %}
+                                <option>{{ p }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group" id="id-group-producto">
+                            <label class="control-label">Producto</label>
+                            <select name="producto_transferir" id="id-producto-transferir" class="form-control select2-transferencia"
+                                data-maximum-input-length="100" data-placeholder="Elegir producto a transferir">
+                                <option></option>
+                                {% for p in productos %}
+                                <option>{{ p }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="row">
+                            <div class="form-group col-xs-12 col-md-6">
+                                <label class="control-label">Cantidad</label>
+                                <input name="cantidad_transferir" id="id-cantidad-transferir" type="number" step="0.01" class="form-control"
+                                    placeholder="Escriba la cantidad">
+                            </div>
+                            <div class="form-group col-xs-12 col-md-6">
+                                <label class="control-label">Tipo</label>
+                                <select name="tipo_transferencia" class="form-control">
+                                    <option value="1" selected>Permanente</option>
+                                    <option value="0">Temporal</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button id="id-btn-transfer" class="btn btn-primary pull-right" type="submit">Transferir</a>
+                    </form>
+                    {% else %}
+                    <div class="callout callout-danger">
+                        <p>No tienes permisos para utilizar este formulario.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-xs-12 col-lg-12">
+            <div id="dashboard-statisticts-panel" class="panel panel-light">
+                <div class="panel-heading">
+                    <div class="panel-title">
+                        <i class="fa fa-list-alt"></i> Registro de operaciones recientes
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="table-responsive{% if not perms.Almacen.view_registro %} hidden{% endif %}">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Bloque</th>
+                                    <th>Empleado</th>
+                                    <th>Fecha</th>
+                                    <th>Producto</th>
+                                    <th>Unidad</th>
+                                    <th>Cantidad</th>
+                                    <th>Tipo</th>
+                                    <th>Usuario</th>
+                                </tr>
+                            </thead>
+                            <tbody id="id-registros">
+                                {% if perms.Almacen.view_registro %}
+                                {% if registros %}
+                                {% for p in registros %}
+                                <tr>
+                                    <td style="white-space:nowrap">
+                                        {{ p.pk }}
+                                    </td>
+                                    <td style="white-space:nowrap">
+                                        {{ p.bloque }}
+                                    </td>
+                                    <td style="white-space:nowrap">
+                                        {{ p.empleado }}
+                                    </td>
+                                    <td style="white-space:nowrap">
+                                        {{ p.fecha|date:'Y-m-d' }}
+                                    </td>
+                                    <td style="white-space:nowrap">
+                                        {{ p.producto }}
+                                    </td>
+                                    <td style="white-space:nowrap">
+                                        {{ p.producto.unidad }}
+                                    </td>
+                                    <td style="white-space:nowrap">
+                                        {{ p.cantidad }}
+                                    </td>
+                                    <td style="white-space:nowrap">
+                                        {% if p.tipo == 1 %}
+                                        Entrada
+                                        {% elif p.tipo == 0 %}
+                                        Salida
+                                        {% else %}
+                                        Prestado
+                                        {% endif %}
+                                    </td>
+                                    <td style="white-space:nowrap">
+                                        {{ p.usuario.username|upper }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% else %}
+                                <tr>
+                                    <td colspan="9" style="color: orange;">No hay elementos que mostrar. La tabla se
+                                        encuentra vac&iacute;a en este momento.</td>
+                                </tr>
+                                {% endif %}
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% if not perms.Almacen.view_registro %}
+                    <div class="callout callout-danger">
+                        <p>No tienes permisos para ver esta tabla.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-xs-12 col-lg-12">
+            <div class="panel panel-light">
+                <div class="panel-heading">
+                    <div class="panel-title">
+                        <i class="fa fa-list-alt"></i> Productos existentes en almac&eacute;n
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="table-responsive{% if not perms.Almacen.view_inventario %} hidden{% endif %}">
+                        <table class="display table table-striped table-bordered" id="data-table-inventario" width="100%">
+                            <thead>
+                                <tr data-dt-order="disable">
+                                    <th class="with-input col-sm-1"><input type="text" class="form-control input-sm" style="width: 100%;" /></th>
+                                    <th class="with-input" style="min-width: 135px;">
+                                        <select class="form-control input-sm" style="width: 100%;">
+                                            <option value=""></option>
+                                            {% for p in bloques %}
+                                            <option>{{ p }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </th>
+                                    <th class="with-input"><input type="text" class="form-control input-sm" style="width: 100%;" /></th>
+                                    <th class="with-input" style="min-width: 135px;">
+                                        <select class="form-control input-sm" style="width: 100%;">
+                                            <option value=""></option>
+                                            {% for p in unidades %}
+                                            <option>{{ p }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </th>
+                                    <th class="with-input"><input type="text" class="form-control input-sm" style="width: 100%;" /></th>
+                                </tr>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Bloque</th>
+                                    <th>Nombre</th>
+                                    <th>Unidad</th>
+                                    <th>Cantidad</th>
+                                </tr>
+                            </thead>
+                            <tbody id="id-inventario">
+                                {% if perms.Almacen.view_inventario %}
+                                {% if existencias %}
+                                {% for p in existencias %}
+                                <tr>
+                                    <td>
+                                        {{ p.producto.pk }}
+                                    </td>
+                                    <td style="white-space:nowrap">
+                                        {{ p.bloque }}
+                                    </td>
+                                    <td style="white-space:nowrap">
+                                        {{ p.producto }}
+                                    </td>
+                                    <td>
+                                        {{ p.producto.unidad }}
+                                    </td>
+                                    <td>
+                                        {{ p.cantidad }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% endif %}
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% if not perms.Almacen.view_inventario %}
+                    <div class="callout callout-danger">
+                        <p>No tienes permisos para ver esta tabla.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    var tableInventario;
+    var dt_lang = {
+        "decimal": "",
+        "emptyTable": "No hay información",
+        "info": "Mostrando _START_ a _END_ de _TOTAL_ entradas",
+        "infoEmpty": "Mostrando 0 to 0 of 0 entradas",
+        "infoFiltered": "(Filtrado de _MAX_ total entradas)",
+        "infoPostFix": "",
+        "thousands": ",",
+        "lengthMenu": "Mostrar _MENU_ entradas",
+        "loadingRecords": "Cargando...",
+        "processing": "Procesando...",
+        "search": "Buscar:",
+        "zeroRecords": "Sin resultados encontrados",
+        "paginate": {
+            "first": "&lt;&lt;",
+            "last": "&gt;&gt;",
+            "next": "&gt;",
+            "previous": "&lt;"
+        },
+        'buttons': {
+			pageLength: 'Mostrar %d entradas'
+		}
+    };
+    LobiAdmin.loadScript([
+        "{% static 'js/plugin/select2v4/select2.min.js' %}"
+    ], function () {
+        LobiAdmin.loadScript([
+            "{% static 'js/plugin/select2v4/i18n/es.js' %}"
+        ], initPage);
+    });
+
+    function initPage() {
+        $('.select2-registro').select2({
+            tags: true,
+            language: 'es',
+            width: '100%'
+        });
+        $('.select2-transferencia').select2({
+            language: 'es',
+            width: '100%'
+        });
+        $('#id-producto').on('change', function (e) {
+            mostrarOcultarUnidad();
+        });
+    }
+
+    function mostrarOcultarUnidad() {
+        if (esNuevoProducto($('#id-producto').val())) {
+            $('#id-group-producto').removeClass('col-md-12').addClass('col-md-8');
+            $('#id-group-unidad').removeClass('hidden');
+        } else {
+            $('#id-group-producto').removeClass('col-md-8').addClass('col-md-12');
+            $('#id-group-unidad').addClass('hidden');
+        }
+    }
+
+    function actualizarInventario() {
+        $.ajax({
+            url: "{% url 'inventario_refresh' %}",
+            method: 'POST',
+            data: {
+                csrfmiddlewaretoken: '{{ csrf_token }}'
+            },
+            success: function (data) {
+                if (data != 'NO') {
+                    tableInventario.destroy();
+                    $('#id-inventario').html(data);
+                    tableInventario = $('#data-table-inventario').DataTable({ language: dt_lang }).draw();
+                }
+            }
+        });
+    }
+
+    function actualizarRegistro() {
+        $.ajax({
+            url: "{% url 'registro_refresh' %}",
+            method: 'POST',
+            data: {
+                csrfmiddlewaretoken: '{{ csrf_token }}'
+            },
+            success: function (data) {
+                if (data != 'NO') {
+                    $('#id-registros').html(data);
+                }
+            }
+        });
+    }
+
+    function mantenerTemporal(id) {
+        var list = document.getElementById(id).children;
+        for (var i = 0; i < list.length; i++) {
+            var el = list[i];
+            if (el.hasAttribute('data-select2-tag')) el.removeAttribute('data-select2-tag');
+        }
+    }
+
+    function esNuevoProducto(prod) {
+        var list = document.getElementById('id-producto').children;
+        var element = undefined;
+        for (var i = 0; i < list.length; i++) {
+            var el = list[i];
+            if (el.innerText == prod) {
+                element = el;
+                break;
+            }
+        }
+        if (element == undefined) return false;
+        return element.hasAttribute('data-select2-tag');
+    }
+
+    function comprobarExistenciasEnError(bloque, empleado, producto, unidad) {
+        $.ajax({
+            url: "{% url 'bloque_exists' %}",
+            method: 'POST',
+            data: {
+                bloque: bloque,
+                csrfmiddlewaretoken: '{{ csrf_token }}'
+            },
+            success: function (data) {
+                if (data == 'YES') {
+                    mantenerTemporal('id-bloque');
+                }
+            }
+        });
+        $.ajax({
+            url: "{% url 'empleado_exists' %}",
+            method: 'POST',
+            data: {
+                empleado: empleado,
+                csrfmiddlewaretoken: '{{ csrf_token }}'
+            },
+            success: function (data) {
+                if (data == 'YES') {
+                    mantenerTemporal('id-empleado');
+                }
+            }
+        });
+        $.ajax({
+            url: "{% url 'producto_exists' %}",
+            method: 'POST',
+            data: {
+                producto: producto,
+                csrfmiddlewaretoken: '{{ csrf_token }}'
+            },
+            success: function (data) {
+                if (data == 'YES') {
+                    mantenerTemporal('id-producto');
+                }
+                mostrarOcultarUnidad();
+            }
+        });
+        $.ajax({
+            url: "{% url 'unidad_exists' %}",
+            method: 'POST',
+            data: {
+                unidad: unidad,
+                csrfmiddlewaretoken: '{{ csrf_token }}'
+            },
+            success: function (data) {
+                if (data == 'YES') {
+                    mantenerTemporal('id-unidad');
+                }
+            }
+        });
+    }
+
+    function enviarRegistro(url, alerta, bloque, empleado, producto, unidad, cantidad, tipo) {
+        $("#id-btn-save").addClass('disabled');
+        $('#id-btn-save').attr('disabled', 'disabled');
+        $.ajax({
+            url: url,
+            method: "POST",
+            data: {
+                alerta,
+                bloque,
+                empleado,
+                producto,
+                unidad,
+                cantidad,
+                tipo,
+                csrfmiddlewaretoken: '{{ csrf_token }}'
+            },
+            success: function (data) {
+                if (data === 'OK' || data.includes('alerta configurada')) {
+                    document.getElementById('id-cantidad').value = '';
+                    if (data === 'OK') {
+                        Lobibox.alert('success', {
+                            title: 'Correcto!',
+                            msg: 'El registro se ha guardado correctamente.',
+                            buttons: {
+                                ok: {
+                                    text: 'Continuar',
+                                    class: 'btn btn-info',
+                                    closeOnClick: true
+                                },
+                            }
+                        });
+                    } else {
+                        Lobibox.alert('warning', {
+                            title: 'Advertencia de agotamiento de recursos',
+                            msg: data,
+                            buttons: {
+                                ok: {
+                                    text: 'Continuar',
+                                    class: 'btn btn-info',
+                                    closeOnClick: true
+                                },
+                            }
+                        });
+                    }
+                    mantenerTemporal('id-bloque');
+                    mantenerTemporal('id-empleado');
+                    mantenerTemporal('id-producto');
+                    mantenerTemporal('id-unidad');
+                    mostrarOcultarUnidad();
+                    actualizarInventario();
+                    actualizarRegistro();
+                } else {
+                    Lobibox.alert('error', {
+                        title: 'Error al guardar!',
+                        msg: data,
+                        buttons: {
+                            ok: {
+                                text: 'Continuar',
+                                class: 'btn btn-info',
+                                closeOnClick: true
+                            },
+                        }
+                    });
+                    comprobarExistenciasEnError(bloque, empleado, producto, unidad);
+                }
+                $("#id-btn-save").removeClass('disabled');
+                $('#id-btn-save').removeAttr('disabled');
+            },
+            error: function (j, s, e) {
+                Lobibox.alert('error', {
+                    title: 'Error al guardar!',
+                    msg: 'Intente de nuevo en unos minutos y si el problema persiste contacte al desarrollador.',
+                    buttons: {
+                        ok: {
+                            text: 'Continuar',
+                            class: 'btn btn-info',
+                            closeOnClick: true
+                        },
+                    }
+                });
+                comprobarExistenciasEnError(bloque, empleado, producto, unidad);
+                $("#id-btn-save").removeClass('disabled');
+                $('#id-btn-save').removeAttr('disabled');
+            }
+        });
+    }
+
+    $("#form-registro").on('submit', function (e) {
+        e.preventDefault();
+        var $form = $(this),
+            alerta = '',
+            bloque = $form.find("select[name='bloque']").val(),
+            empleado = $form.find("select[name='empleado']").val(),
+            producto = $form.find("select[name='producto']").val(),
+            unidad = $form.find("select[name='unidad']").val(),
+            cantidad = $form.find("input[name='cantidad']").val(),
+            tipo = $form.find("select[name='tipo']").val(),
+            url = $form.attr("action");
+        if (tipo == 1 && producto != '') {
+            Lobibox.prompt('text', {
+                title: producto,
+                attrs: {
+                    placeholder: "Alerta de agotamiento (opcional)"
+                },
+                buttons: {
+                    save: {
+                        text: 'Guardar',
+                        class: 'btn btn-info',
+                        closeOnClick: true
+                    },
+                },
+                callback: function ($this, type, ev) {
+                    if (type === 'save') {
+                        alerta = $this.getValue()
+                        enviarRegistro(url, alerta, bloque, empleado, producto, unidad, cantidad, tipo);
+                    }
+                }
+            });
+        } else {
+            enviarRegistro(url, alerta, bloque, empleado, producto, unidad, cantidad, tipo);
+        }
+    });
+
+    $("#form-transferencia").on('submit', function (e) {
+        $("#id-btn-transfer").addClass('disabled');
+        $('#id-btn-transfer').attr('disabled', 'disabled');
+        e.preventDefault();
+        var $form = $(this),
+            bloque_origen = $form.find("select[name='bloque_origen']").val(),
+            bloque_destino = $form.find("select[name='bloque_destino']").val(),
+            producto_transferir = $form.find("select[name='producto_transferir']").val(),
+            cantidad_transferir = $form.find("input[name='cantidad_transferir']").val(),
+            tipo_transferencia = $form.find("select[name='tipo_transferencia']").val(),
+            url = $form.attr("action");
+        $.ajax({
+            url: url,
+            method: "POST",
+            data: {
+                bloque_origen,
+                bloque_destino,
+                producto_transferir,
+                cantidad_transferir,
+                tipo_transferencia,
+                csrfmiddlewaretoken: '{{ csrf_token }}'
+            },
+            success: function (data) {
+                if (data === 'OK') {
+                    document.getElementById('id-cantidad-transferir').value = '';
+                    Lobibox.alert('success', {
+                        title: 'Correcto!',
+                        msg: 'El producto se ha transferido correctamente desde el bloque <b>' + bloque_origen + '</b> hacia el bloque <b>' + bloque_destino + '</b>.',
+                        buttons: {
+                            ok: {
+                                text: 'Continuar',
+                                class: 'btn btn-info',
+                                closeOnClick: true
+                            },
+                        }
+                    });
+                    actualizarInventario();
+                } else {
+                    Lobibox.alert('error', {
+                        title: 'Error al transferir!',
+                        msg: data,
+                        buttons: {
+                            ok: {
+                                text: 'Continuar',
+                                class: 'btn btn-info',
+                                closeOnClick: true
+                            },
+                        }
+                    });
+                }
+                $("#id-btn-transfer").removeClass('disabled');
+                $('#id-btn-transfer').removeAttr('disabled');
+            },
+            error: function (j, s, e) {
+                Lobibox.alert('error', {
+                    title: 'Error al transferir!',
+                    msg: 'Intente de nuevo en unos minutos y si el problema persiste contacte al desarrollador.',
+                    buttons: {
+                        ok: {
+                            text: 'Continuar',
+                            class: 'btn btn-info',
+                            closeOnClick: true
+                        },
+                    }
+                });
+                $("#id-btn-transfer").removeClass('disabled');
+                $('#id-btn-transfer').removeAttr('disabled');
+            }
+        });
+    });
+
+    LobiAdmin.loadScript([
+        "{% static 'js/plugin/datatables/datatables.min.js' %}"
+    ], initDataTableInventario);
+    function initDataTableInventario() {
+        tableInventario = $('#data-table-inventario').DataTable({
+            language: dt_lang,
+            layout: {
+                topStart: {
+                    buttons: [
+                        {
+                            extend: 'pageLength'
+                        },
+                        {
+                            extend: 'pdf',
+                            text:'Exportar a PDF',
+                            title: 'Dreacht & Struchtur',
+                            exportOptions: {
+                                customizeData: function (data) {
+                                    data.headerStructure.shift();
+                                }
+                            }
+                        },
+                        {
+                            extend: 'print',
+                            text:'Imprimir',
+                            title: 'Dreacht & Struchtur',
+                            exportOptions: {
+                                customizeData: function (data) {
+                                    data.headerStructure.shift();
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        });
+        $("#data-table-inventario thead th input[type=text]").on('keyup change', function () {
+            tableInventario
+                .column($(this).closest('th').index() + ':visible')
+                .search(this.value)
+                .draw();
+        });
+        $("#data-table-inventario thead th select").on('change', function () {
+            var val = $.fn.dataTable.util.escapeRegex(
+                $(this).val()
+            );
+            tableInventario
+                .column($(this).closest('th').index() + ':visible')
+                .search(val ? '^' + val + '$' : '', true, false)
+                .draw();
+        });
+    }
+
+    $(".panel").lobiPanel({
+        reload: false,
+        close: false,
+        editTitle: false,
+        unpin: false,
+        minimize: {
+            tooltip: 'Minimizar'
+        },
+        expand: {
+            tooltip: 'Expandir'
+        }
+    });
+</script>

@@ -1,0 +1,35 @@
+<div class="error-page error-404">
+    <h1 class="error-page-code animated pulse"><i class="fa fa-warning"></i> ERROR 404</h1>
+    <h1 class="error-page-text">P&aacute;gina no encontrada</h1>
+    <p class="error-page-subtext">La p&aacute;gina que has solicitado no se encuentra. Estamos trabajando para corregirlo.</p>
+    <p class="error-page-subtext">Vuelve a intentarlo en unos minutos o <a href="/admin">contacta al administrador</a>.</p>
+    <ul class="error-page-actions">
+        <li>
+            <a href="javascript:void(0)" data-func="go-back" class="btn btn-primary btn-outline">
+                <i class="fa fa-arrow-left"></i>
+                Regresar!</a>
+        </li>
+        <li>
+            <a href="#dashboard" class="btn btn-primary btn-outline">
+                <i class="fa fa-home"></i>
+                Portada</a>
+        </li>
+        <li>
+            <a href="javascript:void(0)" class="btn btn-primary btn-outline">
+                <i class="fa fa-envelope-o"></i>
+                Contacto
+            </a>
+        </li>
+        <li>
+            <a href="javascript:void(0)" class="btn btn-primary btn-outline">
+                <i class="fa fa-bug"></i>
+                Reportar
+            </a>
+        </li>
+    </ul>
+</div>
+<script>
+    $('.error-page [data-func="go-back"]').click(function(ev){
+        window.history.back();
+    });
+</script>

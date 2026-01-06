@@ -1,0 +1,254 @@
+{% extends 'modulo_requisicion_pdf/base.html' %}
+{% block title %}Requisiciones - Módulo PDF{% endblock %}
+
+{% block content %}
+<div id="pdf-container">
+    <style>
+        /* Contenedor principal que simula el PDF */
+        #pdf-container {
+            position: relative;
+            width: 1280px;
+            /* Ancho estimado basado en coord 1250 */
+            height: 1100px;
+            /* Alto estimado basado en coord 1009 */
+            margin: 0 auto;
+            background-color: #f5f5f5;
+            /* Fondo gris claro por si falla la imagen */
+            overflow: hidden;
+            border: 1px solid #ccc;
+        }
+
+        /* Canvas para la imagen de fondo */
+        #pdf-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* Campos de formulario */
+        .campo {
+            position: absolute;
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            font-size: 14px;
+            /* Tamaño base legible */
+            background: rgba(255, 255, 255, 0.7);
+            /* Fondo semi-transparente para ver líneas guía */
+            border: 1px solid transparent;
+            /* Borde invisible por defecto */
+            padding: 2px 4px;
+            z-index: 2;
+            height: 24px;
+            /* Altura fija para alineación */
+        }
+
+        .campo:focus {
+            background: white;
+            border: 1px solid #007bff;
+            outline: none;
+        }
+
+        /* Estilos específicos para inputs numéricos */
+        input[type="number"] {
+            text-align: right;
+        }
+
+        /* Botón de generar */
+        #submit-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 100;
+            padding: 15px 30px;
+            font-size: 18px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Forzar vista de escritorio en móviles */
+        @media only screen and (max-width: 1024px) {
+            body {
+                min-width: 1280px;
+            }
+        }
+    </style>
+
+    <!-- Canvas para renderizar el PDF de fondo -->
+    <canvas id="pdf-canvas"></canvas>
+
+    <form id="form-overlay" method="POST" action="">
+        {% csrf_token %}
+
+        <!-- Coordenadas extraídas de views.py (PDF usa origen abajo-izquierda, CSS usamos bottom/left) -->
+        <!-- 'obra': (430, 1009) -->
+        <input type="text" name="obra" value="{{ form.obra.value|default:'' }}" class="campo"
+            style="left: 430px; bottom: 1009px; width: 300px;" placeholder="Obra">
+
+        <!-- 'ubicacion': (470, 974) -->
+        <input type="text" name="ubicacion" value="{{ form.ubicacion.value|default:'' }}" class="campo"
+            style="left: 470px; bottom: 974px; width: 300px;" placeholder="Ubicación">
+
+        <!-- 'numero_de_articulos': (558, 936) -->
+        <input type="number" name="numero_de_articulos" value="{{ form.numero_de_articulos.value|default:'0' }}"
+            class="campo" style="left: 558px; bottom: 936px; width: 100px;" title="Num Artículos">
+
+        <!-- Fechas (Coord X=1250 parece alineación derecha o columna derecha) -->
+        <!-- 'fecha_soli': (1250, 1009) -->
+        <input type="date" name="fecha_soli" value="{{ form.fecha_soli.value|date:'Y-m-d' }}" class="campo"
+            style="left: 1050px; bottom: 1009px; width: 150px;" title="Fecha Solicitud">
+
+        <!-- 'fecha_util': (1250, 974) -->
+        <input type="date" name="fecha_util" value="{{ form.fecha_util.value|date:'Y-m-d' }}" class="campo"
+            style="left: 1050px; bottom: 974px; width: 150px;" title="Fecha Útil">
+
+        <!-- 'fecha_surt': (1250, 936) -->
+        <input type="date" name="fecha_surt" value="{{ form.fecha_surt.value|date:'Y-m-d' }}" class="campo"
+            style="left: 1050px; bottom: 936px; width: 150px;" title="Fecha Surtido">
+
+        <!-- 'contratista_soli': (420, 885) -->
+        <input type="text" name="contratista_soli" value="{{ form.contratista_soli.value|default:'' }}" class="campo"
+            style="left: 420px; bottom: 885px; width: 250px;" placeholder="Contratista Solicitante">
+
+        <!-- 'contratista_auto': (275, 843) -->
+        <input type="text" name="contratista_auto" value="{{ form.contratista_auto.value|default:'' }}" class="campo"
+            style="left: 275px; bottom: 843px; width: 250px;" placeholder="Contratista Autoriza">
+
+        <!-- 'area_util': (400, 797) -->
+        <input type="text" name="area_util" value="{{ form.area_util.value|default:'' }}" class="campo"
+            style="left: 400px; bottom: 797px; width: 250px;" placeholder="Área Útil">
+
+        <!-- 'observaciones': (50, 936) -> Cuidado, overlap con num_articulos? No, num es 558 altura 936. Obs es 50 altura 936? 
+             En views.py: 'observaciones': (50, 936). Están en la misma línea Y. -->
+        <textarea name="observaciones" class="campo"
+            style="left: 50px; bottom: 880px; width: 300px; height: 60px;">{{ form.observaciones.value|default:'' }}</textarea>
+
+        <!-- ITEMS Generados con bucle -->
+        <!-- Logic: y_pos = page_height - y_start - (i-1)*20 -->
+        <!-- y_start = 450. page_height assumed ~1100?? 
+             Wait, views.py uses `page_height - ...`. 
+             If I use bottom: Y, then Y = `page_height - y_pos` is wrong.
+             In PDF, Y=0 is bottom. 
+             views.py: `y_pos = page_height - 450 ...` 
+             So `y_pos` calculates the distance from BOTTOM.
+             So in CSS `bottom: {{ y_pos }}px` is correct!
+             Assuming page_height in views.py logic matched the real PDF height.
+             Let's calculate based on assumptions. 
+             If page_height is unknown, I will inject a JS script to calculate these positions dynamically or stick to absolute pixel values roughly matching context. 
+             
+             Let's blindly use the formula from views.py assuming page_height is NOT needed if we align from TOP?
+             No, views logic subtracts from height.
+             
+             Let's use a JS loop to position them effectively.
+        -->
+        <div id="items-container"></div>
+
+        <!-- Hidden inputs loops required for form submission -->
+        {% for i in "1234567891011121314" %}
+        <!-- Positioned via JS below -->
+        <input type="text" name="item{{ i }}_descripcion" id="input-desc-{{ i }}" class="campo item-field"
+            placeholder="Desc">
+        <input type="text" name="item{{ i }}_unidad" id="input-unidad-{{ i }}" class="campo item-field" placeholder="U">
+        <input type="number" step="0.01" name="item{{ i }}_cantidad" id="input-cant-{{ i }}" class="campo item-field"
+            placeholder="#">
+        {% endfor %}
+
+        <button id="submit-btn" type="submit" class="btn btn-danger">Generar PDF</button>
+    </form>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.9.179/pdf.min.js"></script>
+<script>
+    // Configuración PDF
+    const url = '/static/media/requiscion_template.pdf';
+
+    // Coordenadas items (simulando views.py)
+    // y_start = 450
+    // row_height = 20
+    // desc_x = 50, unidad_x = 200, cant_x = 250
+    // BUT views.py uses: y_pos = page_height - 450 - ...
+    // This means Y is measured from BOTTOM.
+    // CSS 'bottom' property is perfect for this.
+
+    // Asumimos altura de página PDF standard Legal (1008pt) o extraemos del canvas
+    // Mejor estrategia: Usar Top relativo?
+    // Si views.py pone y_pos = page_height - X.
+    // Entonces DistanceFromTop = X.
+    // X = 450 + (i-1)*20.
+    // So 'top: 450px' and increasing.
+
+    const y_start_from_top = 450;
+    const row_height = 25; // Un poco más que 20 para inputs html
+
+    for (let i = 1; i <= 14; i++) {
+        let topPos = y_start_from_top + (i - 1) * row_height;
+
+        let desc = document.getElementById(`input-desc-${i}`);
+        let unidad = document.getElementById(`input-unidad-${i}`);
+        let cant = document.getElementById(`input-cant-${i}`);
+
+        if (desc) {
+            desc.style.left = '50px';
+            desc.style.top = topPos + 'px'; // Usamos top en vez de bottom para items, más fácil
+            desc.style.width = '140px';
+            desc.style.bottom = 'auto'; // Override class
+        }
+        if (unidad) {
+            unidad.style.left = '200px';
+            unidad.style.top = topPos + 'px';
+            unidad.style.width = '40px';
+            unidad.style.bottom = 'auto';
+        }
+        if (cant) {
+            cant.style.left = '250px';
+            cant.style.top = topPos + 'px';
+            cant.style.width = '60px';
+            cant.style.bottom = 'auto';
+        }
+    }
+
+    // PDF.js rendering
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.9.179/pdf.worker.min.js';
+
+    const loadingTask = pdfjsLib.getDocument(url);
+    loadingTask.promise.then(function (pdf) {
+        pdf.getPage(1).then(function (page) {
+            const scale = 1.5; // Ajustar escala para mejor resolución
+            const viewport = page.getViewport({ scale: scale });
+            const canvas = document.getElementById('pdf-canvas');
+            const context = canvas.getContext('2d');
+
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            // Ajustar contenedor al tamaño real del PDF renderizado
+            const container = document.getElementById('pdf-container');
+            container.style.width = (viewport.width / scale) + 'px'; // width CSS visual
+            container.style.height = (viewport.height / scale) + 'px';
+
+            // Aquí podríamos recalcular las posiciones si las coordenadas originales eran en Puntos (1/72 inch)
+            // Y la pantalla es 96 DPI.
+            // Pero por simplicidad, asumimos mapeo directo 1:1 pt:px para empezar.
+
+            const renderContext = {
+                canvasContext: context,
+                viewport: viewport
+            };
+            page.render(renderContext);
+        });
+    }, function (reason) {
+        console.error(reason);
+        // Fallback visual si falla el PDF
+        const canvas = document.getElementById('pdf-canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.font = "30px Arial";
+        ctx.fillStyle = "red";
+        ctx.fillText("Error cargando plantilla PDF", 50, 50);
+    });
+</script>
+{% endblock %}
